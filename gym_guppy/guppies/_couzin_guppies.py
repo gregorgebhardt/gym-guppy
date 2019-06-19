@@ -4,7 +4,7 @@ from typing import List
 from numba import jit, njit
 from scipy.spatial import cKDTree
 
-from gym_guppy.guppies._base_guppies import TurnBoostGuppy, ConstantVelocityGuppy, Guppy
+from gym_guppy.guppies import TurnBoostAgent, ConstantVelocityAgent, Agent, Guppy
 
 _ZOR = 0.005  # zone of repulsion
 _ZOO = 0.09  # zone of orientation
@@ -140,19 +140,19 @@ def _compute_couzin_boost_action(state, world_bounds, max_boost, zor=_ZOR, zoo=_
     return theta_i, boost_i
 
 
-class ClassicCouzinGuppy(ConstantVelocityGuppy):
+class ClassicCouzinGuppy(Guppy, ConstantVelocityAgent):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
         self._turn_noise = .1
         self._k_neighbors = 20
 
-    def compute_next_action(self, state: List[Guppy], kd_tree: cKDTree = None):
+    def compute_next_action(self, state: List[Agent], kd_tree: cKDTree = None):
         d, i = kd_tree.query(state[self.id, :2], k=self._k_neighbors)
         self._turn = _compute_couzin_action(state[i, :], self._world_bounds) + np.random.randn() * self._turn_noise
 
 
-class BoostCouzinGuppy(TurnBoostGuppy):
+class BoostCouzinGuppy(Guppy, TurnBoostAgent):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -160,7 +160,7 @@ class BoostCouzinGuppy(TurnBoostGuppy):
         self._boost_noise = .005
         self._k_neighbors = 20
 
-    def compute_next_action(self, state: List[Guppy], kd_tree: cKDTree = None):
+    def compute_next_action(self, state: List[Agent], kd_tree: cKDTree = None):
         d, i = kd_tree.query(state[self.id, :2], k=self._k_neighbors)
 
         d_theta, d_boost = _compute_couzin_boost_action(state[i, :], self._world_bounds, self._max_boost)

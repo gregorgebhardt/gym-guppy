@@ -6,11 +6,13 @@ import gym
 import numpy as np
 from scipy.spatial import cKDTree
 
-from Box2D import b2World, b2ChainShape
+from Box2D import b2World, b2ChainShape, b2CircleShape
 
+from gym_guppy.guppies import Guppy
 from gym_guppy.guppies._couzin_guppies import ClassicCouzinGuppy, BoostCouzinGuppy
 from ..bodies import Body, _world_scale
-from ..guppies import Guppy
+from ..guppies import Agent
+
 
 class GuppyEnv(gym.Env):
     metadata = {'render.modes': ['human']}
@@ -52,8 +54,10 @@ class GuppyEnv(gym.Env):
 
         self.kd_tree = None
 
-        self.__robots: [Guppy] = []
-        self.__guppies: [Guppy] = []
+        self.__agents: [Agent] = []
+        self.__robots_idx: [int] = []
+        self.__guppies_idx: [int] = []
+
         self.__objects: [Body] = []
 
         self.__seed = 0
@@ -72,19 +76,21 @@ class GuppyEnv(gym.Env):
 
     @property
     def robots(self):
-        return tuple(self.__robots)
+        for r_idx in self.__robots_idx:
+            yield self.__agents[r_idx]
 
     @property
     def num_robots(self):
-        return len(self.__robots)
+        return len(self.__robots_idx)
 
     @property
     def guppies(self):
-        return tuple(self.__guppies)
+        for g_idx in self.__guppies_idx:
+            yield self.__agents[g_idx]
 
     @property
     def num_guppies(self):
-        return len(self.__guppies)
+        return len(self.__guppies_idx)
 
     @property
     def objects(self):
@@ -107,19 +113,26 @@ class GuppyEnv(gym.Env):
     def _steps_per_action(self):
         return self.__steps_per_action
 
-    def _add_guppy(self, guppy: Guppy):
-        if guppy in self.__guppies:
-            warnings.warn("Guppy " + guppy.id + " has already been registered before. Can only register guppy once.")
+    def __add_agent(self, agent: Agent):
+        if agent in self.__agents:
+            warnings.warn("Agent " + agent.id + " has already been registered before.")
             return False
 
-        next_id = self.num_guppies
-        guppy.set_id(next_id)
-        self.__guppies.append(guppy)
+        next_id = len(self.__agents)
+        agent.set_id(next_id)
+        self.__agents.append(agent)
+
         return True
 
-    def _add_robot(self, robot: Guppy):
-        if self._add_guppy(robot):
-            self.__robots.append(robot)
+    def _add_guppy(self, guppy: Guppy):
+        if self.__add_agent(guppy):
+            self.__guppies_idx.append(guppy.id)
+            return True
+        return False
+
+    def _add_robot(self, robot: Agent):
+        if self.__add_agent(robot):
+            self.__robots_idx.append(robot.id)
             return True
         return False
 
@@ -140,7 +153,7 @@ class GuppyEnv(gym.Env):
                                              position=p, orientation=o))
 
     def get_state(self):
-        return np.array([g.get_state() for g in self.__guppies])
+        return np.array([g.get_state() for g in self.guppies])
 
     def get_observation(self):
         return self.get_state()
@@ -158,8 +171,9 @@ class GuppyEnv(gym.Env):
 
     def destroy(self):
         del self.__objects[:]
-        del self.__guppies[:]
-        del self.__robots[:]
+        del self.__agents[:]
+        self.__guppies_idx.clear()
+        self.__robots_idx.clear()
         if self._screen is not None:
             del self._screen
             self._screen = None
@@ -191,16 +205,16 @@ class GuppyEnv(gym.Env):
         state = self.get_state()
 
         # apply action to robots
-        for r, a in zip(self.__robots, action):
+        for r, a in zip(self.robots, action):
             r.set_action(a)
 
         # step guppies
-        for i, g in enumerate(self.__guppies):
+        for i, g in enumerate(self.guppies):
             g.compute_next_action(state=state, kd_tree=self.kd_tree)
 
         for i in range(self.__steps_per_action):
-            for g in self.__guppies:
-                g.step(self.sim_step)
+            for a in self.__agents:
+                a.step(self.sim_step)
 
             # step world
             self.world.Step(self.sim_step, self.__sim_velocity_iterations, self.__sim_position_iterations)
@@ -282,23 +296,13 @@ class GuppyEnv(gym.Env):
             o.draw(self._screen)
 
         # render guppies
-        for g in self.__guppies:
-            g.draw(self._screen)
-
-        # render robots
-        for r in self.__robots:
-            r.draw(self._screen)
+        for a in self.__agents:
+            a.draw(self._screen)
 
         # allow to draw on top
         self._draw_on_top(self._screen)
 
         self._screen.render()
-
-    def get_objects(self) -> [Body]:
-        return self.__objects
-
-    def get_guppies(self) -> [Guppy]:
-        return self.__guppies
 
     def _draw_on_table(self, screen):
         pass

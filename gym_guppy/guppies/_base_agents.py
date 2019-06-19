@@ -8,7 +8,7 @@ from scipy.spatial import cKDTree
 from gym_guppy.bodies import FishBody
 
 
-class Guppy(FishBody, abc.ABC):
+class Agent(FishBody, abc.ABC):
     _max_linear_velocity = 0.2  # meters / s
     _max_angular_velocity = 0.5 * np.pi  # radians / s
 
@@ -49,14 +49,11 @@ class Guppy(FishBody, abc.ABC):
         self._highlight_color = color
 
     @abc.abstractmethod
-    def compute_next_action(self, state: List['Guppy'], kd_tree: cKDTree = None):
-        raise NotImplementedError
-
     def step(self, time_step):
         pass
 
 
-class TorqueThrustGuppy(Guppy, abc.ABC):
+class TorqueThrustAgent(Agent, abc.ABC):
     # TODO add action space
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -95,7 +92,7 @@ class TorqueThrustGuppy(Guppy, abc.ABC):
                 self._body.ApplyAngularImpulse(torque, wake=True)
 
 
-class TurnBoostGuppy(Guppy, abc.ABC):
+class TurnBoostAgent(Agent, abc.ABC):
     """
     The TurnBoosGuppy approximates the behaviour observed with real fish, by first turning into a desired direction
     and then performing a forward boost.
@@ -123,7 +120,7 @@ class TurnBoostGuppy(Guppy, abc.ABC):
             self._boost -= b
 
 
-class ConstantVelocityGuppy(Guppy, abc.ABC):
+class ConstantVelocityAgent(Agent, abc.ABC):
     _linear_damping = .0
     _angular_damping = .0
 
