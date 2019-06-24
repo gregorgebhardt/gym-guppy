@@ -6,6 +6,11 @@ from gym_guppy.guppies import Agent, TurnBoostAgent
 
 
 class Robot(Agent, abc.ABC):
+    def __init__(self, world, world_bounds, position=None, orientation=None):
+        super().__init__(world, world_bounds, position, orientation)
+
+        self._color = np.array((165, 98, 98))
+
     @abc.abstractmethod
     def set_action(self, action):
         pass
