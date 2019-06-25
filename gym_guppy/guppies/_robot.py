@@ -6,8 +6,8 @@ from gym_guppy.guppies import Agent, TurnBoostAgent
 
 
 class Robot(Agent, abc.ABC):
-    def __init__(self, world, world_bounds, position=None, orientation=None):
-        super().__init__(world, world_bounds, position, orientation)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
         self._color = np.array((165, 98, 98))
 
@@ -23,8 +23,8 @@ class TurnBoostRobot(Robot, TurnBoostAgent):
 
 
 class GoToRobot(Robot, TurnBoostAgent):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(** kwargs)
 
         self._target = None
 

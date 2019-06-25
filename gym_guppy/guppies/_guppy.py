@@ -14,17 +14,11 @@ class Guppy(Agent, abc.ABC):
 
 
 class TorqueGuppy(Guppy, TorqueThrustAgent):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
     def compute_next_action(self, **kwargs):
         self._torque = 250
 
 
 class BoostGuppy(Guppy, TorqueThrustAgent):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
     def compute_next_action(self, state: List['Agent'], kd_tree: cKDTree = None):
         print(str(self._body.mass) + " " + str(self._body.linearVelocity))
         if np.linalg.norm(self._body.linearVelocity) < .05:

@@ -20,9 +20,9 @@ class Agent(FishBody, abc.ABC):
     _linear_damping = 15.  # * _world_scale
     _angular_damping = 60.  # * _world_scale
 
-    def __init__(self, world, world_bounds, position=None, orientation=None):
+    def __init__(self, *, world_bounds, **kwargs):
         # all parameters in real world units
-        super().__init__(world=world, position=position, orientation=orientation, length=0.02, width=0.004)
+        super().__init__(length=0.02, width=0.004, **kwargs)
         self._body.bullet = True
 
         self._world_bounds = np.asarray(world_bounds)
