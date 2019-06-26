@@ -8,14 +8,16 @@ from gym_guppy.guppies import Agent
 
 
 class Feedback:
-    def __init__(self):
+    def __init__(self, length=100, update_rate=10):
+        self._update_rate = update_rate
+
         self._alpha_fear = .5
         self._alpha_follow = .5
 
-        self._fear_value_recorder = BoundedDeque(maxlen=500)
-        self._fear_average_recorder = BoundedDeque(maxlen=500)
-        self._follow_value_recorder = BoundedDeque(maxlen=500)
-        self._follow_average_recorder = BoundedDeque(maxlen=500)
+        self._fear_value_recorder = deque(maxlen=length)
+        self._fear_average_recorder = deque(maxlen=length)
+        self._follow_value_recorder = deque(maxlen=length)
+        self._follow_average_recorder = deque(maxlen=length)
 
         self._alphaE = 0.0025
         self._alphaO = 0.005
@@ -23,51 +25,56 @@ class Feedback:
         self._fear_scaling = 8.0
         self._follow_scaling = 2.0
 
-        self._guppy_history = PoseHistory(maxlen=500)
-        self._robot_history = PoseHistory(maxlen=500)
+        self._guppy_history = PoseHistory(maxlen=length)
+        self._robot_history = PoseHistory(maxlen=length)
 
         self._leading_zone = 0.28
 
         self._safe_speed = 0.03
         self._panic_speed = 0.2
 
-    def update(self, guppy: Agent, robot: Agent):
-        robot_pose = robot.get_pose()
-        guppy_pose = guppy.get_pose()
+    @property
+    def fear(self):
+        return self._alpha_fear
 
-        self._robot_history.append(robot_pose)
-        self._guppy_history.append(guppy_pose)
+    @property
+    def follow(self):
+        return self._alpha_follow
+
+    def update(self, guppy_pose: np.ndarray, robot_pose: np.ndarray):
+        self._robot_history.store(robot_pose)
+        self._guppy_history.store(guppy_pose)
 
         # compute distance
         dist = np.linalg.norm(robot_pose - guppy_pose)
         is_social = dist < self._leading_zone * 2
 
         if len(self._fear_value_recorder) == 0:
-            self._fear_value_recorder.append(0)
+            self._fear_value_recorder.appendleft(0)
         if len(self._follow_value_recorder) == 0:
-            self._follow_value_recorder.append(0)
+            self._follow_value_recorder.appendleft(0)
 
-        e = is_social * self.get_fear() * self._fear_scaling
-        o = is_social * self.get_follow() * self._follow_scaling
-        e = self._alphaE * e + (1 - self._alphaE) * self._fear_value_recorder[-1]
-        o = self._alphaO * o + (1 - self._alphaO) * self._follow_value_recorder[-1]
+        e = is_social * self._get_fear() * self._fear_scaling
+        o = is_social * self._get_follow() * self._follow_scaling
+        e = self._alphaE * e + (1 - self._alphaE) * self._fear_value_recorder[0]
+        o = self._alphaO * o + (1 - self._alphaO) * self._follow_value_recorder[0]
 
-        self._fear_value_recorder.append(e)
-        self._follow_value_recorder.append(o)
+        self._fear_value_recorder.appendleft(e)
+        self._follow_value_recorder.appendleft(o)
 
         self._alpha_fear = min(max(e, 0.0), 1.0)
         self._alpha_follow = min(max(o, 0.0), 1.0)
 
-    def get_fear(self):
-        approach_dist = self.get_approach_dist()
+    def _get_fear(self):
+        approach_dist = self._get_approach_dist()
         # crop approach dist to negative values and take the double absolute value
         approach_dist = -2. * min(approach_dist, 0.0)
 
         # normalize approach dist to range [safe_speed, panic_speed]
         return min(max(approach_dist - self._safe_speed, 0.0), self._panic_speed) / self._panic_speed
 
-    def get_follow(self):
-        approach_dist = self.get_approach_dist()
+    def _get_follow(self):
+        approach_dist = self._get_approach_dist()
         # crop approach dist to negative values and take the double absolute value
         approach_dist = 2. * max(approach_dist, 0.0)
 
@@ -77,31 +84,28 @@ class Feedback:
         # normalize approach dist to range [safe_speed, panic_speed]
         return min(max(approach_dist - self._safe_speed, 0.0), self._panic_speed) / self._panic_speed
 
-    def get_approach_dist(self):
-            guppy_now = self._guppy_history.positions[0]
-            guppy_prv = self._guppy_history.positions[-1]
+    def _get_approach_dist(self):
+            guppy_now = self._guppy_history.positions[10]
+            guppy_prv = self._guppy_history.positions[0]
 
-            robot_prv = self._robot_history.positions[-1]
+            robot_prv = self._robot_history.positions[10]
 
             # movement vector of the fish
-            fish_vector = guppy_now - guppy_prv
+            guppy_vec = guppy_now - guppy_prv
             # fish-robot vector at previous time step
-            fish_robot_vector = robot_prv - guppy_prv
+            guppy_robot_vec = robot_prv - guppy_prv
 
             # approach distance is the projection of the fish movement vector onto the line robot-fish
-            return fish_vector.dot(fish_robot_vector) / np.linalg.norm(fish_robot_vector)
+            return guppy_vec.dot(guppy_robot_vec) / np.linalg.norm(guppy_robot_vec)
 
+    def infer_guppy_motion_direction(self, time_window=1):
+        time_steps = int(time_window * self._update_rate)
 
-class BoundedDeque(deque):
-    def append(self, x) -> None:
-        if len(self) >= self.maxlen:
-            self.popleft()
-        super(BoundedDeque, self).append(x)
+        guppy_prv = self._guppy_history.positions[time_steps]
+        guppy_now = self._guppy_history.positions[time_steps]
 
-    def appendleft(self, x) -> None:
-        if len(self) >= self.maxlen:
-            self.pop()
-        super(BoundedDeque, self).appendleft(x)
+        guppy_vec = guppy_now - guppy_prv
+        return guppy_vec / np.linalg.norm(guppy_vec)
 
 
 class PoseHistory(collections.Iterable, collections.Sized):
@@ -118,11 +122,9 @@ class PoseHistory(collections.Iterable, collections.Sized):
     def __iter__(self):
         return self._pose_history.__iter__()
 
-    def append(self, pose):
-        if len(self._pose_history) == self._pose_history.maxlen:
-            self._pose_history.popleft()
-
-        self._pose_history.extend(np.asarray(pose))
+    def store(self, pose):
+        assert len(pose) == 3
+        self._pose_history.appendleft(np.asarray(pose))
 
     @property
     def poses(self):

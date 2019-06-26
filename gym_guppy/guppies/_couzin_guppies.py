@@ -90,6 +90,7 @@ def _compute_couzin_boost(local_positions, max_boost, i_r, i_o, i_a):
     return d_boost
 
 
+@njit
 def _wall_repulsion(self_pos, self_theta, world_bounds, zor=_ZOR):
     theta_w = .0
     dist_to_walls = np.abs(world_bounds - self_pos)
@@ -103,6 +104,7 @@ def _wall_repulsion(self_pos, self_theta, world_bounds, zor=_ZOR):
         theta_w += np.mean(sign * np.abs(_WALL_NORMALS_DIRECTION[close_walls])) - self_theta
 
     return theta_w
+
 
 @jit
 def _compute_couzin_action(state, world_bounds, zor=_ZOR, zoo=_ZOO, zoa=_ZOA, field_of_perception=_FOP):
@@ -121,7 +123,7 @@ def _compute_couzin_action(state, world_bounds, zor=_ZOR, zoo=_ZOO, zoa=_ZOA, fi
     return theta_i + theta_w
 
 
-# @jit
+@jit
 def _compute_couzin_boost_action(state, world_bounds, max_boost, zor=_ZOR, zoo=_ZOO, zoa=_ZOA,
                                  field_of_perception=_FOP):
     local_positions, local_orientations, dist, phi = _compute_local_state(state)
@@ -161,7 +163,10 @@ class BoostCouzinGuppy(Guppy, TurnBoostAgent):
         self._k_neighbors = 20
 
     def compute_next_action(self, state: List[Agent], kd_tree: cKDTree = None):
-        d, i = kd_tree.query(state[self.id, :2], k=self._k_neighbors)
+        k = min(self._k_neighbors, len(state))
+        d, i = kd_tree.query(state[self.id, :2], k=k)
+        if k == 1:
+            i = [i]
 
         d_theta, d_boost = _compute_couzin_boost_action(state[i, :], self._world_bounds, self._max_boost)
         # d_theta, d_boost = _compute_couzin_boost_action(state, self.id, self._max_boost)

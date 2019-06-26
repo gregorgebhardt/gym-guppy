@@ -1,5 +1,9 @@
+import os
+os.environ['NUMBA_DISABLE_JIT'] = "1"
+
 import numpy as np
 from gym_guppy.envs import GuppyEnv
+
 
 env = GuppyEnv()
 env.reset()

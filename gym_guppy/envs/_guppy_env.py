@@ -141,7 +141,7 @@ class GuppyEnv(gym.Env):
 
     # @abc.abstractmethod
     def _configure_environment(self):
-        num_guppies = 50
+        num_guppies = 1
         # random initialization
         positions = np.random.normal(loc=.0, scale=.05, size=(num_guppies, 2))
         orientations = np.random.rand(num_guppies) * 2 * np.pi - np.pi
@@ -153,7 +153,7 @@ class GuppyEnv(gym.Env):
                                              position=p, orientation=o))
 
     def get_state(self):
-        return np.array([g.get_state() for g in self.guppies])
+        return np.array([a.get_state() for a in self.__agents])
 
     def get_observation(self):
         return self.get_state()
