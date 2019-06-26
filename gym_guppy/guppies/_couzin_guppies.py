@@ -5,6 +5,7 @@ from numba import jit, njit
 from scipy.spatial import cKDTree
 
 from gym_guppy.guppies import TurnBoostAgent, ConstantVelocityAgent, Agent, Guppy
+from gym_guppy.tools import rotation
 
 _ZOR = 0.005  # zone of repulsion
 _ZOO = 0.09  # zone of orientation
@@ -19,8 +20,9 @@ _WALL_NORMALS_DIRECTION = np.deg2rad([0, 90, 180, -90])
 
 @jit
 def _compute_local_state(state):
-    c, s = np.cos(state[0, 2]), np.sin(state[0, 2])
-    R = np.array(((c, -s), (s, c)))
+    # c, s = np.cos(state[0, 2]), np.sin(state[0, 2])
+    # R = np.array(((c, -s), (s, c)))
+    R = rotation(state[0, 2])
     local_positions = (state[:, :2] - state[0, :2]).dot(R)
     local_orientations = state[:, 2] - state[0, 2]
     # filter local neighbor orientations to [-π, π]
