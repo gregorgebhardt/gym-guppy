@@ -4,8 +4,6 @@ from collections import deque
 import numpy as np
 import typing
 
-from gym_guppy.guppies import Agent
-
 
 class Feedback:
     def __init__(self, length=100, update_rate=10):
@@ -45,6 +43,9 @@ class Feedback:
         self._robot_history.store(robot_pose)
         self._guppy_history.store(guppy_pose)
 
+        if len(self._robot_history) < self._robot_history.maxlen:
+            return
+
         # compute distance
         dist = np.linalg.norm(robot_pose - guppy_pose)
         is_social = dist < self._leading_zone * 2
@@ -66,7 +67,7 @@ class Feedback:
         self._alpha_follow = min(max(o, 0.0), 1.0)
 
     def _get_fear(self):
-        approach_dist = self._get_approach_dist()
+        approach_dist = self.get_approach_dist()
         # crop approach dist to negative values and take the double absolute value
         approach_dist = -2. * min(approach_dist, 0.0)
 
@@ -74,7 +75,7 @@ class Feedback:
         return min(max(approach_dist - self._safe_speed, 0.0), self._panic_speed) / self._panic_speed
 
     def _get_follow(self):
-        approach_dist = self._get_approach_dist()
+        approach_dist = self.get_approach_dist()
         # crop approach dist to negative values and take the double absolute value
         approach_dist = 2. * max(approach_dist, 0.0)
 
@@ -84,27 +85,37 @@ class Feedback:
         # normalize approach dist to range [safe_speed, panic_speed]
         return min(max(approach_dist - self._safe_speed, 0.0), self._panic_speed) / self._panic_speed
 
-    def _get_approach_dist(self):
-            guppy_now = self._guppy_history.positions[10]
-            guppy_prv = self._guppy_history.positions[0]
+    def get_approach_dist(self):
+        dt = 10
+        if len(self._guppy_history) <= dt:
+            dt = len(self._guppy_history) - 1
 
-            robot_prv = self._robot_history.positions[10]
+        guppy_now = self._guppy_history.positions[0]
+        guppy_prv = self._guppy_history.positions[dt]
+        robot_prv = self._robot_history.positions[dt]
 
-            # movement vector of the fish
-            guppy_vec = guppy_now - guppy_prv
-            # fish-robot vector at previous time step
-            guppy_robot_vec = robot_prv - guppy_prv
+        # movement vector of the fish
+        guppy_vec = guppy_now - guppy_prv
+        # fish-robot vector at previous time step
+        guppy_robot_vec = robot_prv - guppy_prv
 
-            # approach distance is the projection of the fish movement vector onto the line robot-fish
-            return guppy_vec.dot(guppy_robot_vec) / np.linalg.norm(guppy_robot_vec)
+        # approach distance is the projection of the fish movement vector onto the line robot-fish
+        return guppy_vec.dot(guppy_robot_vec) / np.linalg.norm(guppy_robot_vec)
 
     def infer_guppy_motion_direction(self, time_window=1):
         time_steps = int(time_window * self._update_rate)
+        if len(self._guppy_history) <= time_steps:
+            time_steps = len(self._guppy_history) - 1
 
         guppy_prv = self._guppy_history.positions[time_steps]
-        guppy_now = self._guppy_history.positions[time_steps]
+        guppy_now = self._guppy_history.positions[0]
 
         guppy_vec = guppy_now - guppy_prv
+        # guppy_vec is zero
+        if np.all(guppy_vec == 0):
+            sin = np.sin(self._guppy_history.orientations[0])
+            cos = np.cos(self._guppy_history.orientations[0])
+            return np.array([cos, sin])
         return guppy_vec / np.linalg.norm(guppy_vec)
 
 
@@ -125,6 +136,10 @@ class PoseHistory(collections.Iterable, collections.Sized):
     def store(self, pose):
         assert len(pose) == 3
         self._pose_history.appendleft(np.asarray(pose))
+
+    @property
+    def maxlen(self):
+        return self._pose_history.maxlen
 
     @property
     def poses(self):
