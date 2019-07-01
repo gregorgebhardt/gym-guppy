@@ -27,10 +27,10 @@ def ray_casting_walls(fish_pose, world_bounds, ray_orientations):
 def _ray_casting_walls(fish_pose, world_bounds, ray_orientations):
     fish_position = fish_pose[:2]
     fish_orientation = fish_pose[2]
-    ray_orientations = ray_orientations.reshape((-1, 1))
+    ray_orientations = ray_orientations.reshape((-1, 1)) - fish_orientation
     world_bounds = np.asarray(world_bounds)
 
-    ray_orientations -= fish_orientation
+    # ray_orientations -= fish_orientation
     ray_sin = np.sin(ray_orientations)
     ray_cos = np.cos(ray_orientations)
 
