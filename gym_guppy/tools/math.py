@@ -67,15 +67,21 @@ def _ray_casting_walls(fish_pose, world_bounds, ray_orientations):
 
 @njit
 def compute_line_line_intersection(line1: np.ndarray, line2: np.ndarray):
+    # check that the lines are given as 2d-arrays and convert if necessary
     line1 = np.atleast_2d(line1)
     line2 = np.atleast_2d(line2)
+    assert line1.ndim == 2
+    assert line2.ndim == 2
 
+    # check if lines are given as 3d homogeneous coordinates and that we have either 1-n, n-1, n-n (element wise)
     assert line1.shape[1] == 3
     assert line2.shape[1] == 3
     assert line1.shape[0] == line2.shape[0] or line1.shape[0] == 1 or line2.shape[0] == 1
 
+    # compute the last coordinate of the intersections
     c = (line1[:, 0] * line2[:, 1] - line1[:, 1] * line2[:, 0]).reshape(-1, 1)
 
+    # if this coordinate is 0 then there is no intersection
     inz = c.nonzero()[0]
     r = np.empty(shape=(len(c), 2)) * np.nan
 
@@ -86,6 +92,7 @@ def compute_line_line_intersection(line1: np.ndarray, line2: np.ndarray):
     if line2.shape[0] > 1:
         i2 = inz
 
+    # compute coordinates of intersections
     a = line1[i1, 1] * line2[i2, 2] - line2[i2, 1] * line1[i1, 2]
     b = line2[i2, 0] * line1[i1, 2] - line1[i1, 0] * line2[i2, 2]
     r[inz, :] = np.concatenate((a.reshape((-1, 1)), b.reshape((-1, 1))), axis=1) / c[inz]

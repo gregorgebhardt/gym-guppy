@@ -98,8 +98,10 @@ class GuppyEnv(gym.Env):
 
     @property
     def action_space(self):
-        # TODO implement
-        return None
+        actions_low = np.asarray([r.action_space.low for r in self.robots])
+        actions_high = np.asarray([r.action_space.high for r in self.robots])
+
+        return gym.spaces.Box(low=actions_low, high=actions_high)
 
     @property
     def observation_space(self):

@@ -1,5 +1,6 @@
 import abc
 
+import gym
 import numpy as np
 
 from gym_guppy.guppies import Agent, TurnBoostAgent
@@ -11,18 +12,23 @@ class Robot(Agent, abc.ABC):
 
         self._color = np.array((165, 98, 98))
 
+    @property
+    @abc.abstractmethod
+    def action_space(self) -> gym.spaces.Box:
+        pass
+
     @abc.abstractmethod
     def set_action(self, action):
         pass
 
 
-class TurnBoostRobot(Robot, TurnBoostAgent):
+class TurnBoostRobot(Robot, TurnBoostAgent, abc.ABC):
     def set_action(self, action):
         self._turn = action[0]
         self._boost = action[1]
 
 
-class GoToRobot(Robot, TurnBoostAgent):
+class GoToRobot(Robot, TurnBoostAgent, abc.ABC):
     def __init__(self, **kwargs):
         super().__init__(** kwargs)
 
