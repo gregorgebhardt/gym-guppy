@@ -1,4 +1,5 @@
 from numba import njit
+from numba import jit
 
 import numpy as np
 
@@ -89,3 +90,27 @@ def compute_line_line_intersection(line1: np.ndarray, line2: np.ndarray):
     b = line2[i2, 0] * line1[i1, 2] - line1[i1, 0] * line2[i2, 2]
     r[inz, :] = np.concatenate((a.reshape((-1, 1)), b.reshape((-1, 1))), axis=1) / c[inz]
     return r
+
+
+@jit
+def raycast_agents(state_self, state_others, bins, num_bins, cutoff):
+    c, s = np.cos(state_self[2]), np.sin(state_self[2])
+    R = np.array(((c, -s), (s, c)))
+    local_positions = (state_others[:,:2] - state_self[:2]).dot(R)
+    # compute polar coordinates
+    dist = np.linalg.norm(local_positions, axis=1)
+    phi = np.arctan2(local_positions[:, 1], local_positions[:, 0])
+    # filter out fishes outside field of vision
+    within_fop = np.abs(phi) <= cutoff 
+    phi = phi[within_fop]
+    dist = dist[within_fop]
+    # identify the right bin for each angle
+    idx = np.searchsorted(bins, phi, side="left")
+    idx = idx - (np.abs(phi - bins[idx-1]) < np.abs(phi - bins[idx]))
+    # Sort in descending order of distances, which ensures that we fill each bin with 
+    # the distance of the nearest agent belonging to the bin
+    reverse_argsorted_dist = np.flip(np.argsort(dist))
+    sorted_idx = idx[reverse_argsorted_dist]
+    out = np.zeros(num_bins)
+    out[sorted_idx] = dist[reverse_argsorted_dist]
+    return out
