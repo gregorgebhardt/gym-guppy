@@ -93,10 +93,10 @@ def compute_line_line_intersection(line1: np.ndarray, line2: np.ndarray):
 
 
 @jit
-def raycast_agents(fish_pose, state_others, ray_orientations):
+def ray_casting_agents(fish_pose, others_pose, ray_orientations):
     c, s = np.cos(fish_pose[2]), np.sin(fish_pose[2])
     R = np.array(((c, -s), (s, c)))
-    local_positions = (state_others[:,:2] - fish_pose[:2]).dot(R)
+    local_positions = (others_pose[:,:2] - fish_pose[:2]).dot(R)
     # compute polar coordinates
     dist = np.linalg.norm(local_positions, axis=1)
     phi = np.arctan2(local_positions[:, 1], local_positions[:, 0])
