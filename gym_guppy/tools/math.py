@@ -98,14 +98,13 @@ def compute_line_line_intersection(line1: np.ndarray, line2: np.ndarray):
     r[inz, :] = np.concatenate((a.reshape((-1, 1)), b.reshape((-1, 1))), axis=1) / c[inz]
     return r
 
-
-@jit
+@njit
 def ray_casting_agents(fish_pose, others_pose, ray_orientations):
     c, s = np.cos(fish_pose[2]), np.sin(fish_pose[2])
     R = np.array(((c, -s), (s, c)))
     local_positions = (others_pose[:,:2] - fish_pose[:2]).dot(R)
     # compute polar coordinates
-    dist = np.linalg.norm(local_positions, axis=1)
+    dist = np.sqrt(np.sum(local_positions**2, axis=1))
     phi = np.arctan2(local_positions[:, 1], local_positions[:, 0])
     # filter out fishes outside field of vision
     within_fop = np.abs(phi) <= ray_orientations[-1]
@@ -116,7 +115,7 @@ def ray_casting_agents(fish_pose, others_pose, ray_orientations):
     idx = idx - (np.abs(phi - ray_orientations[idx-1]) < np.abs(phi - ray_orientations[idx]))
     # Sort in descending order of distances, which ensures that we fill each ray_orientation with 
     # the distance of the nearest agent belonging to the ray_orientation
-    reverse_argsorted_dist = np.flip(np.argsort(dist))
+    reverse_argsorted_dist = np.argsort(dist)[::-1]
     sorted_idx = idx[reverse_argsorted_dist]
     out = np.zeros(len(ray_orientations) - 1)
     out[sorted_idx] = dist[reverse_argsorted_dist]
