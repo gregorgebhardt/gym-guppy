@@ -93,24 +93,24 @@ def compute_line_line_intersection(line1: np.ndarray, line2: np.ndarray):
 
 
 @jit
-def raycast_agents(state_self, state_others, bins, num_bins, cutoff):
-    c, s = np.cos(state_self[2]), np.sin(state_self[2])
+def raycast_agents(fish_pose, state_others, ray_orientations):
+    c, s = np.cos(fish_pose[2]), np.sin(fish_pose[2])
     R = np.array(((c, -s), (s, c)))
-    local_positions = (state_others[:,:2] - state_self[:2]).dot(R)
+    local_positions = (state_others[:,:2] - fish_pose[:2]).dot(R)
     # compute polar coordinates
     dist = np.linalg.norm(local_positions, axis=1)
     phi = np.arctan2(local_positions[:, 1], local_positions[:, 0])
     # filter out fishes outside field of vision
-    within_fop = np.abs(phi) <= cutoff 
+    within_fop = np.abs(phi) <= ray_orientations[-1]
     phi = phi[within_fop]
     dist = dist[within_fop]
-    # identify the right bin for each angle
-    idx = np.searchsorted(bins, phi, side="left")
-    idx = idx - (np.abs(phi - bins[idx-1]) < np.abs(phi - bins[idx]))
-    # Sort in descending order of distances, which ensures that we fill each bin with 
-    # the distance of the nearest agent belonging to the bin
+    # identify the right ray_orientation for each angle
+    idx = np.searchsorted(ray_orientations, phi, side="left")
+    idx = idx - (np.abs(phi - ray_orientations[idx-1]) < np.abs(phi - ray_orientations[idx]))
+    # Sort in descending order of distances, which ensures that we fill each ray_orientation with 
+    # the distance of the nearest agent belonging to the ray_orientation
     reverse_argsorted_dist = np.flip(np.argsort(dist))
     sorted_idx = idx[reverse_argsorted_dist]
-    out = np.zeros(num_bins)
+    out = np.zeros(len(ray_orientations) - 1)
     out[sorted_idx] = dist[reverse_argsorted_dist]
     return out
