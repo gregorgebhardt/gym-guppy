@@ -26,6 +26,11 @@ class TurnBoostRobot(Robot, TurnBoostAgent, abc.ABC):
     def set_action(self, action):
         self._turn = action[0]
         self._boost = action[1]
+    
+    @property
+    def action_space(self):
+        return gym.spaces.Box(low=np.array([-self._max_turn, 0.0]), 
+                              high=np.array([self._max_turn, self._max_boost]))
 
 
 class GoToRobot(Robot, TurnBoostAgent, abc.ABC):
