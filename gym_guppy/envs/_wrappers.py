@@ -37,6 +37,7 @@ class TimeWrapper2(gym.Wrapper):
         self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(shp), dtype=env.observation_space.dtype)
         self.placeholder = np.empty(shp)
         self.max_time_steps = self.env.spec.max_episode_steps
+        self.t = 0
         
     def reset(self):
         obs = self.env.reset()
@@ -45,6 +46,7 @@ class TimeWrapper2(gym.Wrapper):
         return self.placeholder
 
     def step(self, action):
+        self.t += 1
         obs, reward, done, info = self.env.step(action)
         time = self.t/self.max_time_steps
         self.placeholder[0] = time

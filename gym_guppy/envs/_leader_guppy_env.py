@@ -33,10 +33,10 @@ def compute_leadership_bonus(new_state, state):
 class LeaderGuppyEnv(GuppyEnv):
 
     def __init__(self, **kwargs):
-        super().__init__()
         self.leadership_bonus = kwargs['leadership_bonus'] if 'leadership_bonus' in kwargs.keys() else None
         self.ignore_robots = kwargs['ignore_robots'] if 'ignore_robots' in kwargs.keys() else False
-            
+        super().__init__()
+
     # overrides parent method
     def _configure_environment(self):
         num_guppies = 1
@@ -60,9 +60,9 @@ class LeaderGuppyEnv(GuppyEnv):
         if np.isnan(reward):
             raise ValueError('Got NaN-Reward with inputs state {} and past_state {}'.format(state, past_state))
         return reward
-    
+
     # overrides parent method
     def get_state(self):
         if self.ignore_robots:
             return np.array([g.get_state() for g in self.guppies])
-        return np.array([a.get_state() for a in self.__agents])
+        return super().get_state()
