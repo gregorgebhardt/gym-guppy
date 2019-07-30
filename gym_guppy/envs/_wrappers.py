@@ -52,7 +52,16 @@ class TimeWrapper2(gym.Wrapper):
         self.placeholder[0] = time
         self.placeholder[1:] = obs
         return self.placeholder, reward, done, info
+
+
+class FlatActionWrapper(gym.ActionWrapper):
     
+    def __init__(self, env):
+        gym.ActionWrapper.__init__(self, env)
+        self.action_space = gym.spaces.Box(low=self.action_space.low.flatten(), 
+                              high=self.action_space.high.flatten())
+    def action(self, action):
+        return np.expand_dims(action, axis=0)
 
 class DiscreteActionWrapper(gym.ActionWrapper):
     
