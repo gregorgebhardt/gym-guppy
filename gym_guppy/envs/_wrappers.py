@@ -7,6 +7,7 @@ from collections import deque
 from numpy import float32, pi, sin, cos, radians, linspace
 from numpy.random import RandomState, choice
 import numpy as np
+# import pdb
 
 from gym_guppy.tools import ray_casting_walls, ray_casting_agents, LazyFrames
 
@@ -41,7 +42,7 @@ class TimeWrapper2(gym.Wrapper):
         
     def reset(self):
         obs = self.env.reset()
-        self.placeholder[0] = self.t
+        self.placeholder[0] = self.t/self.max_time_steps
         self.placeholder[1:] = obs
         return self.placeholder
 
@@ -66,11 +67,10 @@ class FlatActionWrapper(gym.ActionWrapper):
 class DiscreteActionWrapper(gym.ActionWrapper):
     
     def __init__(self, env, num_bins_turn_rate=20, num_bins_speed=20):
-        print('Warning: DiscreteActionWrapper has not been tested before!')
         gym.ActionWrapper.__init__(self, env)
-        max_turn_rate= env.env_config['turn_rate']
+        max_turn_rate = self.action_space.high[0]
         self.turn_rate_bins = linspace(-max_turn_rate, max_turn_rate, num_bins_turn_rate + 1)
-        max_speed = env.env_config['speed']
+        max_speed = self.action_space.high[1]
         self.speed_bins = linspace(0, max_speed, num_bins_speed + 1)
         self.action_space = spaces.MultiDiscrete([num_bins_turn_rate, num_bins_speed])
 
@@ -94,8 +94,8 @@ class RayCastingWrapper(gym.ObservationWrapper):
         self.obs_placeholder = np.empty(self.observation_space.shape)
      
     def observation(self, state):
-        self.obs_placeholder[0] = 1 - (ray_casting_agents(state[0], state[1:], self.vo_agents) / self.diagonal)
-        self.obs_placeholder[1] = 1 - (ray_casting_walls(state[0], self.world_bounds, self.vo_walls) / self.diagonal)
+        self.obs_placeholder[0] = ray_casting_agents(state[0], state[1:], self.vo_agents, self.diagonal)
+        self.obs_placeholder[1] = ray_casting_walls(state[0], self.world_bounds, self.vo_walls, self.diagonal)
         return self.obs_placeholder
     
     def _prepare_view_bins(self, view_of_agents, view_of_walls):
