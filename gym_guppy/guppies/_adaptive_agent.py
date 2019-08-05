@@ -3,6 +3,7 @@ import enum
 from typing import List
 import warnings
 
+import gym
 import numpy as np
 from scipy.spatial.ckdtree import cKDTree
 
@@ -21,6 +22,10 @@ class AdaptiveAgent(GoToRobot, Guppy):
 
         self._feedback = Feedback()
         self._state: AdaptiveState = ApproachState()
+
+    @property
+    def action_space(self) -> gym.spaces.Box:
+        return gym.spaces.Box(shape=tuple())
 
     def set_action(self, action):
         warnings.warn("The adaptive agent does not accept any agents and should be added as guppy to the env.")

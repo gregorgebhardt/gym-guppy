@@ -196,7 +196,7 @@ class GuppyEnv(gym.Env):
 
         # step to resolve
         self._step_world()
-
+        
         return self.get_observation()
 
     def step(self, action: np.ndarray):
@@ -213,7 +213,7 @@ class GuppyEnv(gym.Env):
         # step guppies
         for i, g in enumerate(self.guppies):
             g.compute_next_action(state=state, kd_tree=self.kd_tree)
-
+            
         for i in range(self.__steps_per_action):
             for a in self.__agents:
                 a.step(self.sim_step)
@@ -229,7 +229,7 @@ class GuppyEnv(gym.Env):
 
         # state
         next_state = self.get_state()
-
+        
         # observation
         observation = self.get_observation()
 

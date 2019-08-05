@@ -1,7 +1,7 @@
 import numpy as np
 from numba import njit
 
-from gym_guppy.guppies import BoostCouzinGuppy, TurnBoostRobot
+from gym_guppy.guppies import BoostCouzinGuppy, TurnBoostRobot, AdaptiveCouzinGuppy
 from . import GuppyEnv
 
 
@@ -35,6 +35,7 @@ class LeaderGuppyEnv(GuppyEnv):
     def __init__(self, **kwargs):
         self.leadership_bonus = kwargs['leadership_bonus'] if 'leadership_bonus' in kwargs.keys() else None
         self.ignore_robots = kwargs['ignore_robots'] if 'ignore_robots' in kwargs.keys() else False
+        self.adaptive = kwargs['adaptive'] if 'adaptive' in kwargs.keys() else False
         super().__init__()
 
     # overrides parent method
@@ -43,16 +44,20 @@ class LeaderGuppyEnv(GuppyEnv):
         # random initialization
         positions = np.random.normal(loc=.0, scale=.05, size=(num_guppies + 1, 2))
         orientations = np.random.rand(num_guppies + 1) * 2 * np.pi - np.pi
-
-        self._add_robot(TurnBoostRobot(world=self.world, world_bounds=self.world_bounds,
-                                       position=positions[0], orientation=orientations[0]))
+        robot = TurnBoostRobot(world=self.world, world_bounds=self.world_bounds,
+                                       position=positions[0], orientation=orientations[0])
+        self._add_robot(robot)
 
         for p, o in zip(positions[1:], orientations[1:]):
-            self._add_guppy(BoostCouzinGuppy(world=self.world, world_bounds=self.world_bounds,
+            if self.adaptive:
+                self._add_guppy(AdaptiveCouzinGuppy(unknown_agents=[robot], world=self.world, world_bounds=self.world_bounds,
+                                             position=p, orientation=o))
+            else:
+                self._add_guppy(BoostCouzinGuppy(world=self.world, world_bounds=self.world_bounds,
                                              position=p, orientation=o))
 
     # overrides parent method
-    def _get_reward(self, state, action, new_state):
+    def get_reward(self, state, action, new_state):
         reward = compute_reward(new_state, state)
         if self.leadership_bonus is not None:
             bonus = compute_leadership_bonus(new_state, state)

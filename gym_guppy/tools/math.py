@@ -20,8 +20,8 @@ def is_point_left(a, b, c):
     return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]) > 0
 
 
-def ray_casting_walls(fish_pose, world_bounds, ray_orientations):
-    return np.nanmin(_ray_casting_walls(fish_pose, world_bounds, ray_orientations), axis=1)
+def ray_casting_walls(fish_pose, world_bounds, ray_orientations, diagonal_length):
+    return 1 - np.nanmin(_ray_casting_walls(fish_pose, world_bounds, ray_orientations), axis=1) / diagonal_length
 
 
 @njit
@@ -99,7 +99,7 @@ def compute_line_line_intersection(line1: np.ndarray, line2: np.ndarray):
     return r
 
 @njit
-def ray_casting_agents(fish_pose, others_pose, ray_orientations):
+def ray_casting_agents(fish_pose, others_pose, ray_orientations, diagonal_length):
     c, s = np.cos(fish_pose[2]), np.sin(fish_pose[2])
     R = np.array(((c, -s), (s, c)))
     local_positions = (others_pose[:,:2] - fish_pose[:2]).dot(R)
@@ -117,6 +117,6 @@ def ray_casting_agents(fish_pose, others_pose, ray_orientations):
     # the distance of the nearest agent belonging to the ray_orientation
     reverse_argsorted_dist = np.argsort(dist)[::-1]
     sorted_idx = idx[reverse_argsorted_dist]
-    out = np.zeros(len(ray_orientations) - 1)
-    out[sorted_idx] = dist[reverse_argsorted_dist]
-    return out
+    out = np.ones(len(ray_orientations) - 1)
+    out[sorted_idx] = dist[reverse_argsorted_dist]/diagonal_length
+    return 1 - out
