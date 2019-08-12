@@ -46,7 +46,7 @@ def proximity_to_center_reward(new_state, half_diagonal):
     return reward
     
 
-class LeadGuppiesEnv(GuppyEnv):
+class LeaderGuppyEnv(GuppyEnv):
 
     def __init__(self, **kwargs):
         self.ignore_robots = kwargs['ignore_robots'] if 'ignore_robots' in kwargs.keys() else False
@@ -86,7 +86,7 @@ class LeadGuppiesEnv(GuppyEnv):
         return super().get_state()
 
 
-class LeadGuppiesToCenterEnv(LeadGuppiesEnv):    
+class LeaderGuppyCenterEnv(LeadGuppiesEnv):    
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

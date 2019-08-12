@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class LazyFrames:
     def __init__(self, frames):
         """This object ensures that common frames between the observations are only stored once."""
