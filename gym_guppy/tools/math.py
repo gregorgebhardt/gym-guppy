@@ -24,7 +24,8 @@ def ray_casting_walls(fish_pose, world_bounds, ray_orientations, diagonal_length
     return 1 - np.nanmin(_ray_casting_walls(fish_pose, world_bounds, ray_orientations), axis=1) / diagonal_length
 
 
-@njit
+#@njit 
+#TODO: Check if Memory Leak still occurs after issue #4093 of Numba was solved
 def _ray_casting_walls(fish_pose, world_bounds, ray_orientations):
     fish_position = fish_pose[:2]
     fish_orientation = fish_pose[2]
@@ -45,7 +46,7 @@ def _ray_casting_walls(fish_pose, world_bounds, ray_orientations):
 
     # intersections of all rays with the walls
     intersections = np.empty((len(ray_orientations), 4)) * np.nan
-
+    
     walls_a = np.array([1., .0, 1., .0]).reshape((-1, 1))
     walls_b = np.array([.0, 1., .0, 1.]).reshape((-1, 1))
     walls_c = (-world_bounds - fish_position).reshape((-1, 1))
