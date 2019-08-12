@@ -1,4 +1,4 @@
-import time
+import abc
 import warnings
 
 import gym
@@ -6,15 +6,14 @@ import gym
 import numpy as np
 from scipy.spatial import cKDTree
 
-from Box2D import b2World, b2ChainShape, b2CircleShape
+from Box2D import b2World, b2ChainShape
 
 from gym_guppy.guppies import Guppy
-from gym_guppy.guppies._couzin_guppies import ClassicCouzinGuppy, BoostCouzinGuppy
 from ..bodies import Body, _world_scale
 from ..guppies import Agent
 
 
-class GuppyEnv(gym.Env):
+class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
     metadata = {'render.modes': ['human']}
 
     world_size = world_width, world_height = 1., 1.
@@ -68,6 +67,10 @@ class GuppyEnv(gym.Env):
 
         self._configure_environment()
 
+        self.action_space = self._get_action_space()
+        self.observation_space = self._get_observation_space()
+        self.state_space = self._get_state_space()
+
         self._step_world()
 
     @property
@@ -76,8 +79,11 @@ class GuppyEnv(gym.Env):
 
     @property
     def robots(self):
-        for r_idx in self.__robots_idx:
-            yield self.__agents[r_idx]
+        return (self.__agents[r_idx] for r_idx in self.__robots_idx)
+
+    @property
+    def robots_idx(self):
+        return tuple(self.__robots_idx)
 
     @property
     def num_robots(self):
@@ -85,8 +91,11 @@ class GuppyEnv(gym.Env):
 
     @property
     def guppies(self):
-        for g_idx in self.__guppies_idx:
-            yield self.__agents[g_idx]
+        return (self.__agents[g_idx] for g_idx in self.__guppies_idx)
+
+    @property
+    def guppy_idx(self):
+        return tuple(self.__guppies_idx)
 
     @property
     def num_guppies(self):
@@ -96,20 +105,22 @@ class GuppyEnv(gym.Env):
     def objects(self):
         return tuple(self.__objects)
 
-    @property
-    def action_space(self):
+    def _get_action_space(self):
         actions_low = np.asarray([r.action_space.low for r in self.robots])
         actions_high = np.asarray([r.action_space.high for r in self.robots])
 
         return gym.spaces.Box(low=actions_low, high=actions_high)
 
-    @property
-    def observation_space(self):
-        return NotImplemented
+    def _get_observation_space(self):
+        return self._get_state_space()
 
-    @property
-    def state_space(self):
-        return NotImplemented
+    def _get_state_space(self):
+        state_low = np.concatenate([self.world_bounds[0], [-np.inf]])
+        state_low = np.tile(state_low, (self.num_robots + self.num_guppies, 1))
+        state_high = np.concatenate([self.world_bounds[1], [np.inf]])
+        state_high = np.tile(state_high, (self.num_robots + self.num_guppies, 1))
+
+        return gym.spaces.Box(low=state_low, high=state_high)
 
     @property
     def _steps_per_action(self):
@@ -141,24 +152,15 @@ class GuppyEnv(gym.Env):
     def _add_object(self, body: Body):
         self.__objects.append(body)
 
-    # @abc.abstractmethod
+    @abc.abstractmethod
     def _configure_environment(self):
-        num_guppies = 1
-        # random initialization
-        positions = np.random.normal(loc=.0, scale=.05, size=(num_guppies, 2))
-        orientations = np.random.rand(num_guppies) * 2 * np.pi - np.pi
-
-        for p, o in zip(positions, orientations):
-            # self._add_guppy(ClassicCouzinGuppy(world=self.world, world_bounds=self.world_bounds,
-            #                                    position=p, orientation=o))
-            self._add_guppy(BoostCouzinGuppy(world=self.world, world_bounds=self.world_bounds,
-                                             position=p, orientation=o))
+        pass
 
     def get_state(self):
         return np.array([a.get_state() for a in self.__agents])
 
-    def get_observation(self):
-        return self.get_state()
+    def get_observation(self, state):
+        return state
 
     # @abc.abstractmethod
     def get_reward(self, state, action, new_state):
@@ -197,7 +199,7 @@ class GuppyEnv(gym.Env):
         # step to resolve
         self._step_world()
         
-        return self.get_observation()
+        return self.get_observation(self.get_state())
 
     def step(self, action: np.ndarray):
         # if self.action_space and action is not None:
@@ -231,7 +233,7 @@ class GuppyEnv(gym.Env):
         next_state = self.get_state()
         
         # observation
-        observation = self.get_observation()
+        observation = self.get_observation(next_state.copy())
 
         # reward
         reward = self.get_reward(state, action, next_state)

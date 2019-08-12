@@ -40,7 +40,7 @@ class TestEnv(GuppyEnv):
 
 env = TestEnv()
 env.reset()
-# env.video_path = 'video_out'
+env.video_path = 'video_out'
 
 for t in range(1000):
     env.render()

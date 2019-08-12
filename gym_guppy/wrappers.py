@@ -1,15 +1,12 @@
-import gym
-from gym import spaces
-from pathlib import Path
-from string import printable
 from collections import deque
 
-from numpy import float32, pi, sin, cos, radians, linspace
-from numpy.random import RandomState, choice
+import gym
 import numpy as np
 # import pdb
+from gym import spaces
+from numpy import float32, linspace
 
-from gym_guppy.tools import ray_casting_walls, ray_casting_agents, LazyFrames
+from gym_guppy.tools import LazyFrames, ray_casting_agents, ray_casting_walls
 
 
 class TimeWrapper(gym.Wrapper):
@@ -135,8 +132,8 @@ class FrameStack(gym.Wrapper):
         assert len(self.frames) == self.k
         return LazyFrames(list(self.frames))
 
+
 class IgnorePastWallsWrapper(gym.ObservationWrapper):
-    
     def __init__(self, env, k):
         gym.ObservationWrapper.__init__(self, env)
         shp = env.observation_space.shape
@@ -149,69 +146,68 @@ class IgnorePastWallsWrapper(gym.ObservationWrapper):
         return self.placeholder
 
     
-class TrackingWrapper(gym.Wrapper):
-    
-    def __init__(self, env, output_dir=None, tags=[], verbose=False):
-        
-        global h5py
-        import h5py # Lazy import to make h5py optional
-        
-        super().__init__(env)
-        self.env_config = self.env.env_config
-        self.output_dir = output_dir
-        self.tags = tags
-        self.verbose = verbose
-        self.env = env
-        
-        print('initializing tracking wrapper') # for debugging
-        print(verbose)
-    
-    def reset(self):
-        state = self.env.reset()
-            
-        path = '{}/{}_{:03d}.hdf5'.format(self.output_dir, self.tags, self.env.rollout_id)
-        track = h5py.File(path, 'w')
-        
-        if self.verbose:
-            print('Saving under path \'{}\''.format(path))
-
-        track.attrs['seed'] = self.env.robofish_seed
-        track.attrs['world'] = self.env.env_config['world']
-        track.attrs['margins'] = self.env.env_config['margins']
-        track.attrs['num_frames'] = self.env.spec.max_episode_steps
-        track.attrs['time_step'] = self.env.step_size
-        if self.tags:
-            track.attrs['tags'] = ','.join(self.tags)
-            
-                
-        datasets = {}
-        agents = [self.env.actor] + self.env.env_agents
-        for agent in agents:
-            dataset = track.create_dataset(f'{agent.uid}',
-                                           shape=(self.env.spec.max_episode_steps, 4),
-                                           dtype=float32,
-                                           chunks=True)
-            dataset[0] = agent.pose
-            dataset.attrs['agent_type'] = encode_agent_type(agent)
-            if hasattr(agent, 'config_file'):
-                dataset.attrs['config_file'] = agent.config_file
-            datasets[agent] = dataset
-        
-        self.datasets = datasets
-        self.track = track
-        
-        agents = [self.env.actor] + self.env.env_agents
-        for agent in agents:
-            self.datasets[agent][self.env.t] = agent.pose
-            
-        return state
-    
-    def step(self, action):
-        # print('tracking wrapper step') # debugging
-        state, reward, done, info = self.env.step(action)
-        agents = [self.env.actor] + self.env.env_agents
-        for agent in agents:
-            self.datasets[agent][self.env.t] = agent.pose
-        if done:
-            self.track.close()
-        return state, reward, done, info
+# class TrackingWrapper(gym.Wrapper):
+#
+#     def __init__(self, env, output_dir=None, tags=[], verbose=False):
+#
+#         global h5py
+#
+#         super().__init__(env)
+#         self.env_config = self.env.env_config
+#         self.output_dir = output_dir
+#         self.tags = tags
+#         self.verbose = verbose
+#         self.env = env
+#
+#         print('initializing tracking wrapper') # for debugging
+#         print(verbose)
+#
+#     def reset(self):
+#         state = self.env.reset()
+#
+#         path = '{}/{}_{:03d}.hdf5'.format(self.output_dir, self.tags, self.env.rollout_id)
+#         track = h5py.File(path, 'w')
+#
+#         if self.verbose:
+#             print('Saving under path \'{}\''.format(path))
+#
+#         track.attrs['seed'] = self.env.robofish_seed
+#         track.attrs['world'] = self.env.env_config['world']
+#         track.attrs['margins'] = self.env.env_config['margins']
+#         track.attrs['num_frames'] = self.env.spec.max_episode_steps
+#         track.attrs['time_step'] = self.env.step_size
+#         if self.tags:
+#             track.attrs['tags'] = ','.join(self.tags)
+#
+#
+#         datasets = {}
+#         agents = [self.env.actor] + self.env.env_agents
+#         for agent in agents:
+#             dataset = track.create_dataset(f'{agent.uid}',
+#                                            shape=(self.env.spec.max_episode_steps, 4),
+#                                            dtype=float32,
+#                                            chunks=True)
+#             dataset[0] = agent.pose
+#             dataset.attrs['agent_type'] = encode_agent_type(agent)
+#             if hasattr(agent, 'config_file'):
+#                 dataset.attrs['config_file'] = agent.config_file
+#             datasets[agent] = dataset
+#
+#         self.datasets = datasets
+#         self.track = track
+#
+#         agents = [self.env.actor] + self.env.env_agents
+#         for agent in agents:
+#             self.datasets[agent][self.env.t] = agent.pose
+#
+#         return state
+#
+#     def step(self, action):
+#         # print('tracking wrapper step') # debugging
+#         state, reward, done, info = self.env.step(action)
+#         agents = [self.env.actor] + self.env.env_agents
+#         for agent in agents:
+#             self.datasets[agent][self.env.t] = agent.pose
+#         if done:
+#             self.track.close()
+#         return state, reward, done, info

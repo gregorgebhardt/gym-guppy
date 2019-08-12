@@ -55,12 +55,16 @@ class Body:
         self._body.position = position * _world_scale
 
     def get_orientation(self):
+        """returns the orientation angle of the body in radians, the orientation value is unbounded"""
         return self._body.angle
 
     def set_orientation(self, orientation):
+        """sets the orientation angle in radians"""
         self._body.angle = orientation
 
     def get_pose(self):
+        """returns the pose of the body, a composition of position and orientation as triple, the orientation is
+        unbounded and given in radians"""
         position = np.asarray(self._body.position) / _world_scale
         return tuple((*position, self._body.angle))
 

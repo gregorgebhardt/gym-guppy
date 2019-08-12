@@ -103,7 +103,6 @@ class GuppiesViewer(object):
             if self._writer:
                 self._writer.append_data(image)
 
-
     @staticmethod
     def close_requested():
         if pygame.display.get_init():
