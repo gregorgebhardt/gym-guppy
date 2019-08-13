@@ -185,20 +185,23 @@ class AdaptiveCouzinGuppy(BoostCouzinGuppy):
     _zone_radius_mean = 0.25
     _zone_radius_noise = 0.01
 
-    def __init__(self, *, unknown_agents: List[Agent], **kwargs):
+    def __init__(self, *, unknown_agents: List[Agent] = None, **kwargs):
         super().__init__(**kwargs)
 
-        self._unknown_agents = unknown_agents
-        self._unknown_agents_ids = [a.id for a in unknown_agents]
+        if unknown_agents is None:
+            self._unknown_agents = []
+        else:
+            self._unknown_agents = unknown_agents
+        self._unknown_agents_ids = [a.id for a in self._unknown_agents]
 
         # currently not used
-        self._feedback = [Feedback() for _ in unknown_agents]
+        self._feedback = [Feedback() for _ in self._unknown_agents]
 
         # initialize zones
         self._adaptive_zone_factors = np.array([self._initial_zone_factor] * len(self._unknown_agents))
         self._zone_radius = self._zone_radius_mean + np.random.rand() * self._zone_radius_noise
 
-    def couzin_zones(self):
+    def adaptive_couzin_zones(self):
         zor = self._zone_radius * self._adaptive_zone_factors
         zoo = (self._zone_radius - zor) * self._adaptive_zone_factors
         zoa = self._zone_radius - zoo - zor
@@ -207,6 +210,8 @@ class AdaptiveCouzinGuppy(BoostCouzinGuppy):
     def compute_next_action(self, state: np.ndarray, kd_tree: cKDTree = None):
         k = min(self._k_neighbors, len(state))
         _, sorted_state_i = kd_tree.query(state[self.id, :2], k=k)
+        if k == 1:
+            sorted_state_i = [sorted_state_i]
 
         # compute couzin actions for known agents
         known_agents_ids = [i for i in sorted_state_i if i not in self._unknown_agents_ids]
@@ -219,7 +224,7 @@ class AdaptiveCouzinGuppy(BoostCouzinGuppy):
         unknown_agents_state = state[unknown_agents_ids]
 
         # compute zones with current factors
-        adaptive_zones = self.couzin_zones()
+        adaptive_zones = self.adaptive_couzin_zones()
 
         # adapt zone factors
         for ua_id, ua_state in zip(unknown_agents_ids, unknown_agents_state):
@@ -231,7 +236,7 @@ class AdaptiveCouzinGuppy(BoostCouzinGuppy):
             else:
                 self._adaptive_zone_factors[ua_id] = max(.2, 0.985 * self._adaptive_zone_factors[ua_id])
 
-        adaptive_zones = self.couzin_zones()
+        adaptive_zones = self.adaptive_couzin_zones()
         d_theta_unknown, d_boost_unknown = .0, .0
         for i, (ua_id, zor, zoo, zoa) in enumerate(zip(self._unknown_agents_ids, *adaptive_zones)):
             d_theta_i, d_boost_i = _compute_couzin_boost_action(state[[self.id, ua_id]], self._world_bounds,
@@ -245,5 +250,46 @@ class AdaptiveCouzinGuppy(BoostCouzinGuppy):
         # self._boost = d_boost_known * len(known_agents_ids) + d_boost_unknown
         # self._boost /= len(self._unknown_agents) + len(known_agents_ids)
 
-        self._turn = max(d_theta_known, d_theta_unknown)
+        if abs(d_theta_known) > abs(d_theta_unknown):
+            self._turn = d_theta_known
+        else:
+            self._turn = d_theta_unknown
         self._boost = max(d_boost_known, d_boost_unknown)
+
+
+class BiasedAdaptiveCouzinGuppy(AdaptiveCouzinGuppy):
+    def __init__(self, *, attraction_points=None, repulsion_points=None, bias_gain=.1, **kwargs):
+        super(BiasedAdaptiveCouzinGuppy, self).__init__(**kwargs)
+
+        self.attraction_points = attraction_points
+        self.repulsion_points = repulsion_points
+        self.bias_gain = bias_gain
+
+    def compute_next_action(self, state: np.ndarray, kd_tree: cKDTree = None):
+        super(BiasedAdaptiveCouzinGuppy, self).compute_next_action(state, kd_tree)
+
+        turn_bias = .0
+
+        # TODO moves to upper left corner...
+
+        if self.attraction_points is not None:
+            for ap in self.attraction_points:
+                local_ap = self.get_local_point(ap)
+                ap_r = np.linalg.norm(local_ap)
+                ap_th = np.arctan2(local_ap[1], local_ap[0])
+
+                if ap_r >= _ZOO:
+                    turn_bias += np.sign(ap_th) * self.bias_gain * self._max_turn
+
+        if self.repulsion_points is not None:
+            for rp in self.repulsion_points:
+                local_rp = self.get_local_point(rp)
+                rp_r = np.linalg.norm(local_rp)
+                rp_th = np.arctan2(local_rp[1], local_rp[0])
+                print(f"rad: {rp_r} theta: {rp_th}")
+
+                if rp_r <= _ZOA:
+                    turn_bias += -1 * np.sign(rp_th) * self.bias_gain * self._max_turn
+
+        self._turn += turn_bias
+
