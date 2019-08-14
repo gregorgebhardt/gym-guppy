@@ -22,13 +22,13 @@ class TestEnv(GuppyEnv):
         for p, o in zip(positions, orientations):
             # self._add_guppy(AdaptiveCouzinGuppy(world=self.world, world_bounds=self.world_bounds,
             #                                     position=p, orientation=o, unknown_agents=[adaptive_agent]))
-            self._add_guppy(BiasedAdaptiveCouzinGuppy(world=self.world, world_bounds=self.world_bounds,
-                                                      position=p, orientation=o,
-                                                      # attraction_points=[[.0, .0]],
-                                                      repulsion_points=[[.0, .0]]
-                                                      ))
-            # self._add_guppy(BoostCouzinGuppy(world=self.world, world_bounds=self.world_bounds,
-            #                                  position=p, orientation=o))
+            # self._add_guppy(BiasedAdaptiveCouzinGuppy(world=self.world, world_bounds=self.world_bounds,
+            #                                           position=p, orientation=o,
+            #                                           # attraction_points=[[.0, .0]],
+            #                                           repulsion_points=[[.0, .0]]
+            #                                           ))
+            self._add_guppy(BoostCouzinGuppy(world=self.world, world_bounds=self.world_bounds,
+                                             position=p, orientation=o))
 
     def _draw_on_table(self, screen):
         for g in self.guppies:

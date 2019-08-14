@@ -8,9 +8,15 @@ def normalize(x: np.ndarray):
     return x / np.sqrt((x ** 2).sum())
 
 
+@njit
 def rotation(alpha):
     c, s = np.cos(alpha), np.sin(alpha)
     return np.array(((c, -s), (s, c)))
+
+
+@njit
+def row_norm(matrix: np.ndarray):
+    return np.sqrt(np.sum(matrix ** 2, axis=1))
 
 
 def is_point_left(a, b, c):
@@ -24,8 +30,8 @@ def ray_casting_walls(fish_pose, world_bounds, ray_orientations, diagonal_length
     return 1 - np.nanmin(_ray_casting_walls(fish_pose, world_bounds, ray_orientations), axis=1) / diagonal_length
 
 
-#@njit 
-#TODO: Check if Memory Leak still occurs after issue #4093 of Numba was solved
+# TODO: Check if Memory Leak still occurs after issue #4093 of Numba was solved
+#@njit
 def _ray_casting_walls(fish_pose, world_bounds, ray_orientations):
     fish_position = fish_pose[:2]
     fish_orientation = fish_pose[2]

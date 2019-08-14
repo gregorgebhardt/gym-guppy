@@ -6,7 +6,7 @@ from scipy.spatial import cKDTree
 
 from gym_guppy.guppies import TurnBoostAgent, ConstantVelocityAgent, Agent, Guppy
 from gym_guppy.tools import Feedback
-from gym_guppy.tools.math import rotation
+from gym_guppy.tools.math import rotation, row_norm
 
 _ZOR = 0.005  # zone of repulsion
 _ZOO = 0.09  # zone of orientation
@@ -20,7 +20,7 @@ _WALL_NORMALS = np.array([[1, 0],
 _WALL_NORMALS_DIRECTION = np.deg2rad([0, 90, 180, -90])
 
 
-@jit
+@njit
 def _compute_local_state(state):
     # c, s = np.cos(state[0, 2]), np.sin(state[0, 2])
     # R = np.array(((c, -s), (s, c)))
@@ -31,7 +31,8 @@ def _compute_local_state(state):
     local_orientations = (local_orientations + np.pi) % (2 * np.pi) - np.pi
 
     # compute polar coordinates
-    dist = np.linalg.norm(local_positions, axis=1)
+    # dist = np.linalg.norm(local_positions, axis=1)
+    dist = row_norm(local_positions)
     phi = np.arctan2(local_positions[:, 1], local_positions[:, 0])
 
     return local_positions, local_orientations, dist, phi
@@ -48,11 +49,11 @@ def _compute_zone_indices(dist, phi, zor=_ZOR, zoo=_ZOO, zoa=_ZOA, field_of_perc
     return i_r, i_o, i_a, i_fop
 
 
-@jit
+@njit
 def _compute_couzin_direction(local_positions, local_orientations, i_r, i_o, i_a):
     if np.any(i_r):
         # compute desired direction to evade fish in zor
-        d_i = -1 * np.mean(local_positions[i_r] / np.linalg.norm(local_positions[i_r], axis=1, keepdims=True), axis=0)
+        d_i = -1 * np.sum(local_positions[i_r] / row_norm(local_positions[i_r]), axis=0) / len(i_r)
 
         # compute angle between desired direction and own direction
         d_theta = np.arctan2(d_i[1], d_i[0])
@@ -63,12 +64,12 @@ def _compute_couzin_direction(local_positions, local_orientations, i_r, i_o, i_a
 
         # compute desired direction from fish in zoo
         if np.any(i_o):
-            d_theta += local_orientations[i_o].mean(axis=0)
+            d_theta += np.sum(local_orientations[i_o], axis=0) / len(i_o)
             denominator += 1.
 
         # compute desired direction from fish in zoa
         if np.any(i_a):
-            d_ia = local_positions[i_a].mean(axis=0)
+            d_ia = np.sum(local_positions[i_a], axis=0) / len(i_a)
             d_theta += np.arctan2(d_ia[1], d_ia[0])
 
             d_theta /= denominator + 1.
@@ -110,7 +111,7 @@ def _wall_repulsion(self_pos, self_theta, world_bounds, zor=_ZOR):
     return theta_w
 
 
-@jit
+@njit
 def _compute_couzin_action(state, world_bounds, zor=_ZOR, zoo=_ZOO, zoa=_ZOA, field_of_perception=_FOP):
     if len(state) == 1:
         return 0.0
@@ -127,7 +128,7 @@ def _compute_couzin_action(state, world_bounds, zor=_ZOR, zoo=_ZOO, zoa=_ZOA, fi
     return theta_i + theta_w
 
 
-@jit
+@njit
 def _compute_couzin_boost_action(state, world_bounds, max_boost, zor=_ZOR, zoo=_ZOO, zoa=_ZOA,
                                  field_of_perception=_FOP):
     local_positions, local_orientations, dist, phi = _compute_local_state(state)
@@ -269,8 +270,6 @@ class BiasedAdaptiveCouzinGuppy(AdaptiveCouzinGuppy):
         super(BiasedAdaptiveCouzinGuppy, self).compute_next_action(state, kd_tree)
 
         turn_bias = .0
-
-        # TODO moves to upper left corner...
 
         if self.attraction_points is not None:
             for ap in self.attraction_points:
