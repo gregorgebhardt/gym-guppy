@@ -146,6 +146,35 @@ class IgnorePastWallsWrapper(gym.ObservationWrapper):
         return self.placeholder
 
     
+class TrackAdaptiveZones(gym.Wrapper):
+    
+    def __init__(self, env, include_in_observation, record=False):
+        gym.Wrapper.__init__(self, env)
+        if not (include_in_observation or record):
+            print('Warning: Using TrackAdaptiveZones-Wrapper without effect.')
+        if record:
+            print('Warning: Recording not implemented yet!')
+        self.include_in_observation = include_in_observation
+        if include_in_observation:
+            num_guppies = env.num_guppies
+            self.observation_space = spaces.Tuple((env.observation_space, spaces.Box(low=0.0, high=np.inf, shape=(num_guppies*3,))))
+
+    def reset(self):
+        state = self.env.reset()
+        if self.include_in_observation:
+            return (state, self.zones()) 
+        return state
+    
+    def step(self, action):
+        state, reward, done, info = self.env.step(action)
+        if self.include_in_observation:
+            return (state, self.zones()), reward, done, info 
+        return state, reward, done, info
+    
+    def zones(self):
+        return np.array([g.couzin_zones() for g in self.env.guppies if isinstance(g, AdaptiveCouzinGuppy)]).flatten()
+
+
 # class TrackingWrapper(gym.Wrapper):
 #
 #     def __init__(self, env, output_dir=None, tags=[], verbose=False):
