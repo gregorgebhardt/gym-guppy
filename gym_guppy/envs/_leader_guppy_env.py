@@ -86,7 +86,7 @@ class LeaderGuppyEnv(GuppyEnv):
         return super().get_state()
 
 
-class LeaderGuppyCenterEnv(LeadGuppiesEnv):    
+class LeaderGuppyCenterEnv(LeaderGuppyEnv):    
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
