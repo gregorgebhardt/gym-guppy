@@ -38,7 +38,7 @@ def _ray_casting_walls(fish_pose, world_bounds, ray_orientations):
     if len(fish_pose) == 3:
         fish_orientation = fish_pose[2]
     else:
-        fish_orientation = np.arctan2(fish_pose[1], fish_pose[0])
+        fish_orientation = np.arctan2(fish_pose[3], fish_pose[2])
     ray_orientations = ray_orientations.reshape((-1, 1)) - fish_orientation
     world_bounds = np.asarray(world_bounds)
 
