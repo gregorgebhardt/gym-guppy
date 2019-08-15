@@ -33,8 +33,12 @@ def ray_casting_walls(fish_pose, world_bounds, ray_orientations, diagonal_length
 # TODO: Check if Memory Leak still occurs after issue #4093 of Numba was solved
 #@njit
 def _ray_casting_walls(fish_pose, world_bounds, ray_orientations):
+    assert len(fish_pose) in [3, 4], 'expecting 3- or 4-dimensional vector for fish_pose'
     fish_position = fish_pose[:2]
-    fish_orientation = fish_pose[2]
+    if len(fish_pose) == 3:
+        fish_orientation = fish_pose[2]
+    else:
+        fish_orientation = np.arctan2(fish_pose[1], fish_pose[0])
     ray_orientations = ray_orientations.reshape((-1, 1)) - fish_orientation
     world_bounds = np.asarray(world_bounds)
 
@@ -109,7 +113,7 @@ def compute_line_line_intersection(line1: np.ndarray, line2: np.ndarray):
 def ray_casting_agents(fish_pose, others_pose, ray_orientations, diagonal_length):
     c, s = np.cos(fish_pose[2]), np.sin(fish_pose[2])
     R = np.array(((c, -s), (s, c)))
-    local_positions = (others_pose[:,:2] - fish_pose[:2]).dot(R)
+    local_positions = (others_pose[:, :2] - fish_pose[:2]).dot(R)
     # compute polar coordinates
     dist = np.sqrt(np.sum(local_positions**2, axis=1))
     phi = np.arctan2(local_positions[:, 1], local_positions[:, 0])
