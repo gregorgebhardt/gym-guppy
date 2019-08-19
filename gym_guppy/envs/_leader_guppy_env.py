@@ -2,7 +2,7 @@ import numpy as np
 from numba import njit
 import warnings
 
-from gym_guppy.guppies import BoostCouzinGuppy, TurnBoostRobot, AdaptiveCouzinGuppy
+from gym_guppy.guppies import BoostCouzinGuppy, TurnBoostRobot, AdaptiveCouzinGuppy, BiasedAdaptiveCouzinGuppy
 from . import GuppyEnv
 
 
@@ -50,7 +50,7 @@ class LeaderGuppyEnv(GuppyEnv):
 
     def __init__(self, **kwargs):
         self.ignore_robots = kwargs['ignore_robots'] if 'ignore_robots' in kwargs.keys() else False
-        self.adaptive = kwargs['adaptive'] if 'adaptive' in kwargs.keys() else False
+        self.guppy_type = kwargs['guppy_type'] if 'guppy_type' in kwargs.keys() else 'BoostCouzin'
         self.leadership_bonus = kwargs['leadership_bonus'] if 'leadership_bonus' in kwargs.keys() else 0
         self._num_guppies = kwargs['num_guppies'] if 'num_guppies' in kwargs.keys() else 1
         super().__init__()
@@ -65,13 +65,21 @@ class LeaderGuppyEnv(GuppyEnv):
         self._add_robot(robot)
 
         for p, o in zip(positions[1:], orientations[1:]):
-            if self.adaptive:
+            if self.guppy_type == 'AdaptiveCouzin':
                 self._add_guppy(AdaptiveCouzinGuppy(unknown_agents=[robot], world=self.world, world_bounds=self.world_bounds,
                                              position=p, orientation=o))
-            else:
+            elif self.guppy_type == 'BoostCouzin':
                 self._add_guppy(BoostCouzinGuppy(world=self.world, world_bounds=self.world_bounds,
                                              position=p, orientation=o))
-
+            elif self.guppy_type == 'BiasedAdaptiveCouzin':
+                self._add_guppy(BiasedAdaptiveCouzinGuppy(world=self.world, world_bounds=self.world_bounds, 
+                                                  position=p, orientation=o, repulsion_points=[[.0, .0]]))
+            else:
+                raise ValueError('Guppy type does not exist.')
+            
+            if self._GuppyEnv__reset_counter <= 1:
+                print('Added {}Guppy'.format(self.guppy_type))
+                
     # overrides parent method
     def get_reward(self, state, action, new_state):
         reward = cosine_similarity_with_leadership_bonus_reward(new_state, state, self.leadership_bonus)
@@ -89,9 +97,10 @@ class LeaderGuppyEnv(GuppyEnv):
 class LeaderGuppyCenterEnv(LeaderGuppyEnv):    
     
     def __init__(self, **kwargs):
+        kwargs['guppy_type'] = 'BiasedAdaptiveCouzin'
         super().__init__(**kwargs)
         self.half_diagonal = np.linalg.norm(self.world_bounds[0] - self.world_bounds[1]) / 2.
-    
+        
     # overrides parent method
     def get_reward(self, state, action, new_state):
         reward = proximity_to_center_reward(new_state, self.half_diagonal)
