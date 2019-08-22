@@ -22,10 +22,10 @@ class Robot(Agent, abc.ABC):
         pass
 
 
-class TurnBoostRobot(Robot, TurnBoostAgent, abc.ABC):
+class TurnBoostRobot(Robot, TurnBoostAgent):
     def set_action(self, action):
-        self._turn = action[0]
-        self._boost = action[1]
+        self.turn = action[0]
+        self.boost = action[1]
     
     @property
     def action_space(self):
@@ -33,7 +33,7 @@ class TurnBoostRobot(Robot, TurnBoostAgent, abc.ABC):
                               high=np.array([self._max_turn, self._max_boost]))
 
 
-class GoToRobot(Robot, TurnBoostAgent, abc.ABC):
+class GoToRobot(Robot, TurnBoostAgent):
     def __init__(self, **kwargs):
         super().__init__(** kwargs)
 
@@ -62,13 +62,13 @@ class GoToRobot(Robot, TurnBoostAgent, abc.ABC):
             phi = np.arctan2(local_target[1], local_target[0])
 
             # compute turn and boost
-            self._turn = phi
-            if abs(self._turn) < self._turn_eps:
-                self._turn = .0
-            self._boost = d * self._boost_gain
+            self.turn = phi
+            if abs(self.turn) < self._turn_eps:
+                self.turn = .0
+            self.boost = d * self._boost_gain
         else:
-            self._turn = .0
-            self._boost = .0
+            self.turn = .0
+            self.boost = .0
 
     def set_action(self, action):
         self._target = action

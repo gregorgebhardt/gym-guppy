@@ -27,15 +27,13 @@ class Agent(FishBody, abc.ABC):
 
         self._world_bounds = np.asarray(world_bounds)
 
-        self._color = np.array((133, 133, 133))
-
         # will be set by the environment
         self._id = None
 
         # put all guppies into same group (negative so that no collisions are detected)
         self._fixtures[0].filterData.groupIndex = -1
 
-        self._body_color = (150, 150, 150)
+        self._color = np.array((133, 133, 133))
         self._highlight_color = (255, 255, 255)
 
     def set_id(self, id):
@@ -104,20 +102,36 @@ class TurnBoostAgent(Agent, abc.ABC):
         self._max_turn = np.pi / 10.
         self._max_boost = .05
 
-        self._turn = None
-        self._boost = None
+        self.__turn = None
+        self.__boost = None
+
+    @property
+    def turn(self):
+        return self.__turn
+
+    @turn.setter
+    def turn(self, turn):
+        self.__turn = turn
+
+    @property
+    def boost(self):
+        return self.__boost
+
+    @boost.setter
+    def boost(self, boost):
+        self.__boost = np.maximum(boost, .0)
 
     def step(self, time_step):
-        if self._turn:
-            t = np.minimum(np.maximum(self._turn, -self._max_turn), self._max_turn)
+        if self.turn:
+            t = np.minimum(np.maximum(self.turn, -self._max_turn), self._max_turn)
             self._body.angle += t
             self._body.linearVelocity = b2Vec2(.0, .0)
-            self._turn -= t
-        elif self._boost:
-            b = np.minimum(self._boost, self._max_boost)
+            self.turn -= t
+        elif self.boost:
+            b = np.minimum(self.boost, self._max_boost)
             self._body.ApplyLinearImpulse(self._body.GetWorldVector(b2Vec2(b, .0)),
                                           point=self._body.worldCenter, wake=True)
-            self._boost -= b
+            self.boost -= b
 
 
 class ConstantVelocityAgent(Agent, abc.ABC):

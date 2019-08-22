@@ -128,7 +128,7 @@ def _compute_couzin_action(state, world_bounds, zor=_ZOR, zoo=_ZOO, zoa=_ZOA, fi
     return theta_i + theta_w
 
 
-@njit
+# @njit
 def _compute_couzin_boost_action(state, world_bounds, max_boost, zor=_ZOR, zoo=_ZOO, zoa=_ZOA,
                                  field_of_perception=_FOP):
     local_positions, local_orientations, dist, phi = _compute_local_state(state)
@@ -173,11 +173,12 @@ class BoostCouzinGuppy(Guppy, TurnBoostAgent):
         if k == 1:
             i = [i]
 
-        d_theta, d_boost = _compute_couzin_boost_action(state[i, :], self._world_bounds, self._max_boost)
+        out = _compute_couzin_boost_action(state[i, :], self._world_bounds, self._max_boost)
+        d_theta, d_boost = out
         # d_theta, d_boost = _compute_couzin_boost_action(state, self.id, self._max_boost)
-        self._turn = d_theta + np.random.randn() * self._turn_noise
+        self.turn = d_theta + np.random.randn() * self._turn_noise
         # there is already noise on boost when no guppy in z_r
-        self._boost = d_boost
+        self.boost = d_boost
 
 
 class AdaptiveCouzinGuppy(BoostCouzinGuppy):
@@ -246,16 +247,16 @@ class AdaptiveCouzinGuppy(BoostCouzinGuppy):
             d_boost_unknown += d_boost_i
 
         # combine desired movements
-        # self._turn = d_theta_known * len(known_agents_ids) + d_theta_unknown
-        # self._turn /= len(self._unknown_agents) + len(known_agents_ids)
-        # self._boost = d_boost_known * len(known_agents_ids) + d_boost_unknown
-        # self._boost /= len(self._unknown_agents) + len(known_agents_ids)
+        # self.turn = d_theta_known * len(known_agents_ids) + d_theta_unknown
+        # self.turn /= len(self._unknown_agents) + len(known_agents_ids)
+        # self.boost = d_boost_known * len(known_agents_ids) + d_boost_unknown
+        # self.boost /= len(self._unknown_agents) + len(known_agents_ids)
 
         if abs(d_theta_known) > abs(d_theta_unknown):
-            self._turn = d_theta_known
+            self.turn = d_theta_known
         else:
-            self._turn = d_theta_unknown
-        self._boost = max(d_boost_known, d_boost_unknown)
+            self.turn = d_theta_unknown
+        self.boost = max(d_boost_known, d_boost_unknown)
 
 
 class BiasedAdaptiveCouzinGuppy(AdaptiveCouzinGuppy):
@@ -285,10 +286,9 @@ class BiasedAdaptiveCouzinGuppy(AdaptiveCouzinGuppy):
                 local_rp = self.get_local_point(rp)
                 rp_r = np.linalg.norm(local_rp)
                 rp_th = np.arctan2(local_rp[1], local_rp[0])
-                print(f"rad: {rp_r} theta: {rp_th}")
 
                 if rp_r <= _ZOA:
                     turn_bias += -1 * np.sign(rp_th) * self.bias_gain * self._max_turn
 
-        self._turn += turn_bias
+        self.turn += turn_bias
 
