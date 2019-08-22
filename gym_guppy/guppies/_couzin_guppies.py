@@ -285,7 +285,6 @@ class BiasedAdaptiveCouzinGuppy(AdaptiveCouzinGuppy):
                 local_rp = self.get_local_point(rp)
                 rp_r = np.linalg.norm(local_rp)
                 rp_th = np.arctan2(local_rp[1], local_rp[0])
-                print(f"rad: {rp_r} theta: {rp_th}")
 
                 if rp_r <= _ZOA:
                     turn_bias += -1 * np.sign(rp_th) * self.bias_gain * self._max_turn

@@ -44,6 +44,11 @@ def proximity_to_center_reward(new_state, half_diagonal):
     norm_to_center = np.sqrt(np.sum(env_agents_coordinates, axis=1) ** 2)
     reward = (half_diagonal - np.mean(norm_to_center)) / half_diagonal
     return reward
+
+@njit
+def negative_distance_to_center(new_state):    
+    env_agents_coordinates = new_state[1:, :2]
+    return - np.mean(np.sqrt(np.sum(env_agents_coordinates, axis=1) ** 2))
     
 
 class LeaderGuppyEnv(GuppyEnv):
@@ -103,7 +108,8 @@ class LeaderGuppyCenterEnv(LeaderGuppyEnv):
         
     # overrides parent method
     def get_reward(self, state, action, new_state):
-        reward = proximity_to_center_reward(new_state, self.half_diagonal)
+        # reward = proximity_to_center_reward(new_state, self.half_diagonal)
+        reward = negative_distance_to_center(new_state)
         if np.isnan(reward):
             raise ValueError('Got NaN-Reward with inputs state {} and past_state {}'.format(state, past_state))
         return reward
