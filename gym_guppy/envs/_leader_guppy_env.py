@@ -91,7 +91,7 @@ class LeaderGuppyEnv(GuppyEnv):
                 self._add_guppy(BoostCouzinGuppy(world=self.world, world_bounds=self.world_bounds,
                                              position=p, orientation=o))
             elif self.guppy_type == 'BiasedAdaptiveCouzin':
-                self._add_guppy(BiasedAdaptiveCouzinGuppy(world=self.world, world_bounds=self.world_bounds, 
+                self._add_guppy(BiasedAdaptiveCouzinGuppy(unknown_agents=[robot], world=self.world, world_bounds=self.world_bounds, 
                                                   position=p, orientation=o, repulsion_points=[[.0, .0]]))
             else:
                 raise ValueError('Guppy type does not exist.')
@@ -154,7 +154,7 @@ class CurriculumEnvironment(LeaderGuppyEnv):
     # overrides parent method
     def get_reward(self, state, action, new_state):
         if level == 1:
-            
+            return
         reward = proximity_to_center_reward(new_state, self.half_diagonal)
         if np.isnan(reward):
             raise ValueError('Got NaN-Reward with inputs state {} and past_state {}'.format(state, past_state))
