@@ -6,7 +6,7 @@ import gym
 import numpy as np
 from scipy.spatial import cKDTree
 
-from Box2D import b2World, b2ChainShape
+from Box2D import b2World, b2ChainShape, b2Vec2, b2FixtureDef, b2PolygonShape
 
 from gym_guppy.guppies import Guppy
 from ..bodies import Body, _world_scale
@@ -24,8 +24,8 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
     _observe_light = True
 
     __sim_steps_per_second = 100
-    __sim_velocity_iterations = 6
-    __sim_position_iterations = 2
+    __sim_velocity_iterations = 8
+    __sim_position_iterations = 3
     __steps_per_action = 10
 
     def __new__(cls, **kwargs):
@@ -45,11 +45,25 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
         # create the world in Box2D
         self.world = b2World(gravity=(0, 0), doSleep=True)
         self.tank = self.world.CreateStaticBody(position=(.0, .0))
-        self.tank.CreateFixture(
-            shape=b2ChainShape(vertices=[(_world_scale * self.world_x_range[0], _world_scale * self.world_y_range[1]),
-                                         (_world_scale * self.world_x_range[0], _world_scale * self.world_y_range[0]),
-                                         (_world_scale * self.world_x_range[1], _world_scale * self.world_y_range[0]),
-                                         (_world_scale * self.world_x_range[1], _world_scale * self.world_y_range[1])]))
+        # self.tank.CreateFixture(
+        #     shape=b2ChainShape(vertices=[(_world_scale * self.world_x_range[0], _world_scale * self.world_y_range[1]),
+        #                                  (_world_scale * self.world_x_range[0], _world_scale * self.world_y_range[0]),
+        #                                  (_world_scale * self.world_x_range[1], _world_scale * self.world_y_range[0]),
+        #                                  (_world_scale * self.world_x_range[1], _world_scale * self.world_y_range[1])]))
+
+        wall_shape = b2PolygonShape()
+        wall_width = .05
+        wall_eps = .005
+
+        for s in -1, 1:
+            wall_shape.SetAsBox(wall_width / 2 * _world_scale,
+                                (self.world_height / 2 + wall_width) * _world_scale,
+                                b2Vec2((self.world_width / 2 + wall_width / 2 - wall_eps) * _world_scale * s, .0), .0)
+            self.tank.CreateFixture(shape=wall_shape)
+            wall_shape.SetAsBox((self.world_width / 2 + wall_width) * _world_scale,
+                                wall_width / 2 * _world_scale,
+                                b2Vec2(.0, (self.world_height / 2 + wall_width / 2 - wall_eps) * _world_scale * s), .0)
+            self.tank.CreateFixture(shape=wall_shape)
 
         self.kd_tree = None
 
@@ -222,6 +236,7 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
 
             # step world
             self.world.Step(self.sim_step, self.__sim_velocity_iterations, self.__sim_position_iterations)
+            # self.world.ClearForces()
 
             self.__sim_steps += 1
 
@@ -231,6 +246,7 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
 
         # state
         next_state = self.get_state()
+        # assert self.state_space.contains(next_state)
         
         # observation
         observation = self.get_observation(next_state.copy())

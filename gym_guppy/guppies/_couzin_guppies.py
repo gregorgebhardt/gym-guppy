@@ -10,7 +10,7 @@ from gym_guppy.tools.math import rotation, row_norm
 
 _ZOR = 0.005  # zone of repulsion
 _ZOO = 0.09  # zone of orientation
-_ZOA = 2.0  # zone of attraction
+_ZOA = 1.0  # zone of attraction
 _FOP = np.deg2rad(270)  # field of perception
 
 _WALL_NORMALS = np.array([[1, 0],
@@ -53,7 +53,7 @@ def _compute_zone_indices(dist, phi, zor=_ZOR, zoo=_ZOO, zoa=_ZOA, field_of_perc
 def _compute_couzin_direction(local_positions, local_orientations, i_r, i_o, i_a):
     if np.any(i_r):
         # compute desired direction to evade fish in zor
-        d_i = -1 * np.sum(local_positions[i_r] / row_norm(local_positions[i_r]), axis=0) / len(i_r)
+        d_i = -1 * np.sum(local_positions[i_r] / (row_norm(local_positions[i_r]) + 1e-6), axis=0) / len(i_r)
 
         # compute angle between desired direction and own direction
         d_theta = np.arctan2(d_i[1], d_i[0])
@@ -80,7 +80,7 @@ def _compute_couzin_direction(local_positions, local_orientations, i_r, i_o, i_a
 @njit
 def _compute_couzin_boost(local_positions, max_boost, i_r, i_o, i_a):
     if np.any(i_r):
-        d_boost = max_boost * i_r.sum() / len(local_positions)
+        d_boost = 0.5 * max_boost * i_r.sum() / len(local_positions)
     else:
         n_o = i_o.sum()
         n_a = i_a.sum()
@@ -128,7 +128,7 @@ def _compute_couzin_action(state, world_bounds, zor=_ZOR, zoo=_ZOO, zoa=_ZOA, fi
     return theta_i + theta_w
 
 
-# @njit
+@njit
 def _compute_couzin_boost_action(state, world_bounds, max_boost, zor=_ZOR, zoo=_ZOO, zoa=_ZOA,
                                  field_of_perception=_FOP):
     local_positions, local_orientations, dist, phi = _compute_local_state(state)
@@ -278,8 +278,8 @@ class BiasedAdaptiveCouzinGuppy(AdaptiveCouzinGuppy):
                 ap_r = np.linalg.norm(local_ap)
                 ap_th = np.arctan2(local_ap[1], local_ap[0])
 
-                if ap_r >= _ZOO:
-                    turn_bias += np.sign(ap_th) * self.bias_gain * self._max_turn
+                if _ZOA * .5 >= ap_r >= _ZOR:
+                    turn_bias += np.sign(ap_th) * self.bias_gain * self._max_turn * (1 - ap_r)
 
         if self.repulsion_points is not None:
             for rp in self.repulsion_points:
@@ -288,7 +288,7 @@ class BiasedAdaptiveCouzinGuppy(AdaptiveCouzinGuppy):
                 rp_th = np.arctan2(local_rp[1], local_rp[0])
 
                 if rp_r <= _ZOA:
-                    turn_bias += -1 * np.sign(rp_th) * self.bias_gain * self._max_turn
+                    turn_bias += -1 * np.sign(rp_th) * self.bias_gain * self._max_turn * (1 - rp_r)
 
         self.turn += turn_bias
 

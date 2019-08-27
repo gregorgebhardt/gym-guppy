@@ -111,7 +111,7 @@ class TurnBoostAgent(Agent, abc.ABC):
 
     @turn.setter
     def turn(self, turn):
-        self.__turn = turn
+        self.__turn = np.minimum(np.maximum(turn, -self._max_turn*5), self._max_turn*5)
 
     @property
     def boost(self):
@@ -119,7 +119,7 @@ class TurnBoostAgent(Agent, abc.ABC):
 
     @boost.setter
     def boost(self, boost):
-        self.__boost = np.maximum(boost, .0)
+        self.__boost = np.minimum(np.maximum(boost, .0), self._max_boost*5)
 
     def step(self, time_step):
         if self.turn:
@@ -129,6 +129,7 @@ class TurnBoostAgent(Agent, abc.ABC):
             self.turn -= t
         elif self.boost:
             b = np.minimum(self.boost, self._max_boost)
+            # self._body.ApplyForceToCenter(self._body.GetWorldVector(b2Vec2(b, .0)), wake=True)
             self._body.ApplyLinearImpulse(self._body.GetWorldVector(b2Vec2(b, .0)),
                                           point=self._body.worldCenter, wake=True)
             self.boost -= b
