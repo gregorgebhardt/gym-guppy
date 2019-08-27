@@ -53,7 +53,9 @@ def _compute_zone_indices(dist, phi, zor=_ZOR, zoo=_ZOO, zoa=_ZOA, field_of_perc
 def _compute_couzin_direction(local_positions, local_orientations, i_r, i_o, i_a):
     if np.any(i_r):
         # compute desired direction to evade fish in zor
-        d_i = -1 * np.sum(local_positions[i_r] / (row_norm(local_positions[i_r]) + 1e-6), axis=0) / len(i_r)
+        d_i = -1 * np.sum(local_positions[i_r] / (np.reshape(row_norm(local_positions[i_r]), (-1, 1)) + 1e-8), axis=0)
+        # length not important for angle
+        # d_i /= len(i_r)
 
         # compute angle between desired direction and own direction
         d_theta = np.arctan2(d_i[1], d_i[0])
@@ -64,12 +66,16 @@ def _compute_couzin_direction(local_positions, local_orientations, i_r, i_o, i_a
 
         # compute desired direction from fish in zoo
         if np.any(i_o):
+            # length not important for angle
+            # d_theta += np.sum(local_orientations[i_o], axis=0) / len(i_o)
             d_theta += np.sum(local_orientations[i_o], axis=0) / len(i_o)
             denominator += 1.
 
         # compute desired direction from fish in zoa
         if np.any(i_a):
-            d_ia = np.sum(local_positions[i_a], axis=0) / len(i_a)
+            # length not important for angle
+            # d_ia = np.sum(local_positions[i_a], axis=0) / len(i_a)
+            d_ia = np.sum(local_positions[i_a], axis=0)
             d_theta += np.arctan2(d_ia[1], d_ia[0])
 
             d_theta /= denominator + 1.
