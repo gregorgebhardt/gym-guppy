@@ -50,6 +50,17 @@ class TimeWrapper2(gym.Wrapper):
         self.placeholder[0] = time
         self.placeholder[1:] = obs
         return self.placeholder, reward, done, info
+    
+    
+class NormalizeActionWrapper(gym.ActionWrapper):
+    
+    def __init__(self, env):
+        gym.ActionWrapper.__init__(self, env)
+        self.action_space = gym.spaces.Box(low=0.0, high=1.0, shape=(2,))
+        self.factors = self.env.action_space.low
+        
+    def action(self, action):
+        action[0] = action[0] * 2 - 1
 
 
 class FlatActionWrapper(gym.ActionWrapper):
@@ -60,7 +71,8 @@ class FlatActionWrapper(gym.ActionWrapper):
                               high=self.action_space.high.flatten())
     def action(self, action):
         return np.expand_dims(action, axis=0)
-
+    
+    
 class DiscreteActionWrapper(gym.ActionWrapper):
     
     def __init__(self, env, num_bins_turn_rate=20, num_bins_speed=20):
@@ -145,6 +157,16 @@ class IgnorePastWallsWrapper(gym.ObservationWrapper):
         self.placeholder[2:] = state[1:,0] # Take only view of agents
         return self.placeholder
 
+    
+class MovementLimitWrapper(gym.ActionWrapper):
+    
+    def __init__(self, env, turn_limit=None, speed_limit=None):
+        self.action_space.low[0] = - turn_limit if turn_limit is not None
+        self.action_space.high[0] = turn_limit if turn_limit is not None
+        self.action_space.high[1] = speed_limit if speed_limit is not None
+    
+    def action(self, action):
+        return np.clip(action, self.action_space.low, self.action_space.high)
     
 class TrackAdaptiveZones(gym.Wrapper):
     

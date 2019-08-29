@@ -213,6 +213,7 @@ class AdaptiveCouzinGuppy(BoostCouzinGuppy):
         zor = self._zone_radius * self._adaptive_zone_factors
         zoo = (self._zone_radius - zor) * self._adaptive_zone_factors
         zoa = self._zone_radius - zoo - zor
+        # print('couzin_zones', zor, zoo, zoa)
         return zor, zoo, zoa
 
     def compute_next_action(self, state: np.ndarray, kd_tree: cKDTree = None):
