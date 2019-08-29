@@ -161,9 +161,12 @@ class IgnorePastWallsWrapper(gym.ObservationWrapper):
 class MovementLimitWrapper(gym.ActionWrapper):
     
     def __init__(self, env, turn_limit=None, speed_limit=None):
-        self.action_space.low[0] = - turn_limit if turn_limit is not None
-        self.action_space.high[0] = turn_limit if turn_limit is not None
-        self.action_space.high[1] = speed_limit if speed_limit is not None
+        gym.ActionWrapper.__init__(self, env)
+        if turn_limit is not None:
+            self.action_space.low[0] = - turn_limit
+            self.action_space.high[0] = turn_limit
+        if speed_limit is not None:
+            self.action_space.high[1] = speed_limit
     
     def action(self, action):
         return np.clip(action, self.action_space.low, self.action_space.high)
