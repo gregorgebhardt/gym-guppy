@@ -101,6 +101,7 @@ class RayCastingWrapper(gym.ObservationWrapper):
         self.cutoff = np.radians(degrees) / 2.0
         self.vo_agents, self.vo_walls = self._prepare_view_bins((degrees, num_bins), (degrees, num_bins))
         self.obs_placeholder = np.empty(self.observation_space.shape)
+        self.env.vo_goal = self.vo_agents
      
     def observation(self, state):
         self.obs_placeholder[0] = ray_casting_agents(state[0], state[1:], self.vo_agents, self.diagonal)
