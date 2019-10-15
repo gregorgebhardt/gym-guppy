@@ -155,3 +155,39 @@ class ConstantVelocityAgent(Agent, abc.ABC):
 
         self.set_angular_velocity(.0)
         self.set_linear_velocity((self._velocity, .0), local=True)
+
+
+class TurnSpeedAgent(Agent, abc.ABC):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self._max_turn = np.pi
+        self._max_speed = .05
+
+        self.__turn = None
+        self.__speed = None
+
+    @property
+    def turn(self):
+        return self.__turn
+
+    @turn.setter
+    def turn(self, turn):
+        self.__turn = np.minimum(np.maximum(turn, -self._max_turn), self._max_turn)
+
+    @property
+    def speed(self):
+        return self.__speed
+
+    @speed.setter
+    def speed(self, boost):
+        self.__speed = np.minimum(np.maximum(boost, .0), self._max_speed)
+
+    def step(self, time_step):
+        if self.turn:
+            self._body.angle += self.turn
+            # self._body.linearVelocity = b2Vec2(.0, .0)
+            self.__turn = None
+        if self.speed:
+            self.set_linear_velocity([self.speed, .0], local=True)
+            # self.__speed = None
