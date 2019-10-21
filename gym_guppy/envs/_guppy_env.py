@@ -140,6 +140,11 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
     def _steps_per_action(self):
         return self.__steps_per_action
 
+    @_steps_per_action.setter
+    def _steps_per_action(self, spa: int):
+        warnings.warn(f'Setting steps_per_action to {spa}')
+        self.__steps_per_action = spa
+
     def __add_agent(self, agent: Agent):
         if agent in self.__agents:
             warnings.warn("Agent " + agent.id + " has already been registered before.")
@@ -185,7 +190,7 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
         return False
 
     def get_info(self, state, action):
-        return ""
+        return {}
 
     def destroy(self):
         del self.__objects[:]
@@ -222,6 +227,7 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
         # state before action is applied
         state = self.get_state()
 
+        action = np.atleast_2d(action)
         # apply action to robots
         for r, a in zip(self.robots, action):
             r.set_action(a)

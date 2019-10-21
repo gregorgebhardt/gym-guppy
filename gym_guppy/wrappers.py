@@ -9,6 +9,37 @@ from numpy import float32, linspace
 from gym_guppy.tools import LazyFrames, ray_casting_agents, ray_casting_walls
 
 
+def get_local_poses(poses, relative_to):
+    local_poses = poses - relative_to
+
+    c, s = np.cos(relative_to[2]), np.sin(relative_to[2])
+    R = np.array(((c, -s), (s, c)))
+    local_poses[:, :2] = local_poses[:, :2].dot(R)
+
+    return local_poses
+
+
+def transform_sin_cos(radians):
+    return np.c_[np.sin(radians), np.cos(radians)]
+
+
+class LocalObservationsWrapper(gym.ObservationWrapper):
+    def __init__(self, env, robot_id=0):
+        super(LocalObservationsWrapper, self).__init__(env)
+        self.robot_id = robot_id
+        # TODO: assert action space is n x 3, where n > 1
+        assert isinstance(self.env.observation_space, gym.spaces.Box)
+        assert self.env.observation_space.shape[1] == 3
+        assert self.env.observation_space.shape[0] > 1
+
+    def observation(self, observation):
+        robot_pose = observation[self.robot_id, :]
+        guppy_pose = np.array([r for i, r in enumerate(observation) if i != self.robot_id])
+
+        local_poses = get_local_poses(guppy_pose, robot_pose)
+        return np.c_[local_poses[:, :2], transform_sin_cos(local_poses[:, [2]])]
+
+
 class TimeWrapper(gym.Wrapper):
     
     def __init__(self, env):

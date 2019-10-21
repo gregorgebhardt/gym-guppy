@@ -3,4 +3,10 @@ from ._guppy import Guppy
 from ._robot import Robot, TurnBoostRobot, GoToRobot
 from ._couzin_guppies import ClassicCouzinGuppy, BoostCouzinGuppy, AdaptiveCouzinGuppy, BiasedAdaptiveCouzinGuppy
 from ._adaptive_agent import AdaptiveAgent
-from ._mxnet_guppies import MXNetGuppy
+
+import importlib.util
+spec = importlib.util.find_spec('mxnet')
+if spec is None:
+    print("You need to install `mxnet` to use MXNetGuppy, you can use `pip install mxnet`")
+else:
+    from ._mxnet_guppies import MXNetGuppy

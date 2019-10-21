@@ -162,7 +162,9 @@ class TurnSpeedAgent(Agent, abc.ABC):
         super().__init__(**kwargs)
 
         self._max_turn = np.pi
-        self._max_speed = .05
+        self._max_speed = 1.
+
+        self._time_steps_per_action = 4
 
         self.__turn = None
         self.__speed = None
@@ -180,14 +182,14 @@ class TurnSpeedAgent(Agent, abc.ABC):
         return self.__speed
 
     @speed.setter
-    def speed(self, boost):
-        self.__speed = np.minimum(np.maximum(boost, .0), self._max_speed)
+    def speed(self, speed):
+        self.__speed = np.minimum(np.maximum(speed, -self._max_speed), self._max_speed)
 
     def step(self, time_step):
         if self.turn:
             self._body.angle += self.turn
-            # self._body.linearVelocity = b2Vec2(.0, .0)
             self.__turn = None
         if self.speed:
+            # TODO is speed correct?
             self.set_linear_velocity([self.speed, .0], local=True)
-            # self.__speed = None
+            self.__speed = None
