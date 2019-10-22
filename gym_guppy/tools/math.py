@@ -26,6 +26,19 @@ def is_point_left(a, b, c):
     return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]) > 0
 
 
+@njit
+def get_local_poses(poses, relative_to):
+    local_poses = poses - relative_to
+    R = rotation(relative_to[2])
+    local_poses[:, :2] = local_poses[:, :2].dot(R)
+
+    return local_poses
+
+
+def transform_sin_cos(radians):
+    return np.c_[np.sin(radians), np.cos(radians)]
+
+
 def ray_casting_walls(fish_pose, world_bounds, ray_orientations, diagonal_length):
     return 1 - np.nanmin(_ray_casting_walls(fish_pose, world_bounds, ray_orientations), axis=1) / diagonal_length
 
