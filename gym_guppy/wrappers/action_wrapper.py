@@ -64,3 +64,36 @@ class MovementLimitWrapper(gym.ActionWrapper):
 
     def reverse_action(self, action):
         raise NotImplementedError
+
+
+class RandomizeActionWrapper(gym.ActionWrapper):
+    def __init__(self, env):
+        print('Randomizing Actions')
+        super(RandomizeActionWrapper, self).__init__(env)
+        # TODO: check env.action_space and allow for multi-agent environments
+        # TODO: specify which dimensions should be randomized, not fixed names
+        self.turn_mul: float = 1.
+        self.turn_bias: float = .0
+        self.speed_mul: float = 1.
+        self.randomize_turn = False
+        self.randomize_boost = True
+
+    def reset(self):
+        self.turn_mul = np.random.normal(loc=1.0, scale=0.1)
+        self.turn_bias = np.random.normal(loc=0.0, scale=self.env.action_space.high[0] / 20.)
+        self.speed_mul = np.random.normal(loc=1.0, scale=0.1)
+        return super(RandomizeActionWrapper, self).reset()
+
+    def action(self, action):
+        # TODO: implement this in environment
+        # if self.env.robot_blocked:
+        #     action = np.array([0.0, 0.0], dtype=np.float32)
+        #     return self.env.step(action)
+        if self.randomize_turn:
+            action[0] = action[0] * self.turn_mul + self.turn_bias
+        if self.randomize_boost:
+            action[1] = action[1] * self.speed_mul
+        return action
+
+    def reverse_action(self, action):
+        raise NotImplementedError

@@ -144,3 +144,28 @@ def ray_casting_agents(fish_pose, others_pose, ray_orientations, diagonal_length
     out = np.ones(len(ray_orientations) - 1)
     out[sorted_idx] = dist[reverse_argsorted_dist]/diagonal_length
     return 1 - out
+
+
+@njit
+def ray_casting_goal(fish_pose, goal, ray_orientations, diagonal_length):
+    c, s = np.cos(fish_pose[2]), np.sin(fish_pose[2])
+    R = np.array(((c, -s), (s, c)))
+    local_positions = (goal - fish_pose[:2]).dot(R)
+    # compute polar coordinates
+    local_positions = np.expand_dims(local_positions, axis=0)
+    dist = np.sqrt(np.sum(local_positions ** 2, axis=1))
+    phi = np.arctan2(local_positions[:, 1], local_positions[:, 0])
+    # filter out if outside field of vision
+    within_fop = np.abs(phi) <= ray_orientations[-1]
+    phi = phi[within_fop]
+    dist = dist[within_fop]
+    # identify the right ray_orientation for each angle
+    idx = np.searchsorted(ray_orientations, phi, side="left")
+    idx = idx - (np.abs(phi - ray_orientations[idx - 1]) < np.abs(phi - ray_orientations[idx]))
+    # Sort in descending order of distances, which ensures that we fill each ray_orientation with
+    # the distance of the nearest agent belonging to the ray_orientation
+    reverse_argsorted_dist = np.argsort(dist)[::-1]
+    sorted_idx = idx[reverse_argsorted_dist]
+    out = np.ones(len(ray_orientations) - 1)
+    out[sorted_idx] = dist[reverse_argsorted_dist] / diagonal_length
+    return 1 - out

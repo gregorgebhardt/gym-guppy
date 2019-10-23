@@ -3,8 +3,9 @@ from collections import deque
 import gym
 import numpy as np
 
-from gym_guppy import AdaptiveCouzinGuppy
-from gym_guppy.tools.math import get_local_poses, transform_sin_cos, ray_casting_walls, ray_casting_agents
+from gym_guppy.guppies import AdaptiveCouzinGuppy
+from gym_guppy.tools.math import get_local_poses, transform_sin_cos, ray_casting_walls, ray_casting_agents, \
+    ray_casting_goal
 from gym_guppy.tools.datastructures import LazyFrames
 
 
@@ -26,9 +27,8 @@ class LocalObservationsWrapper(gym.ObservationWrapper):
 
 
 class RayCastingWrapper(gym.ObservationWrapper):
-
     def __init__(self, env, degrees=360, num_bins=36 * 2):
-        gym.ObservationWrapper.__init__(self, env)
+        super(RayCastingWrapper, self).__init__(env)
         self.observation_space = gym.spaces.Box(low=0.0, high=1.0, shape=(2, num_bins), dtype=np.float32)
         self.world_bounds = np.float32((self.env.world_bounds[0], self.env.world_bounds[1]))
         self.diagonal = np.linalg.norm(self.world_bounds[0] - self.world_bounds[1])
@@ -44,16 +44,32 @@ class RayCastingWrapper(gym.ObservationWrapper):
 
     def _prepare_view_bins(self, view_of_agents, view_of_walls):
         fop, view_of_agents_size = view_of_agents
-        view_of_agents_sectors = np.linspace(-self.cutoff,
-                                             self.cutoff,
-                                             view_of_agents_size + 1,
-                                             dtype=np.float32)
+        view_of_agents_sectors = np.linspace(-self.cutoff, self.cutoff, view_of_agents_size + 1, dtype=np.float32)
         fop, view_of_walls_size = view_of_walls
-        view_of_walls_rays = np.linspace(-self.cutoff,
-                                         self.cutoff,
-                                         view_of_walls_size,
-                                         dtype=np.float32)
+        view_of_walls_rays = np.linspace(-self.cutoff, self.cutoff, view_of_walls_size, dtype=np.float32)
         return view_of_agents_sectors, view_of_walls_rays
+
+
+class AddGoalWrapper(gym.ObservationWrapper):
+    def __init__(self, env):
+        print('Adding Goal to observation')
+        super(AddGoalWrapper, self).__init__(env)
+        shape = list(env.observation_space.shape)
+        shape[0] = shape[0] + 1
+        self.observation_space = gym.spaces.Box(low=0.0, high=1.0, shape=shape, dtype=env.observation_space.dtype)
+        # TODO: could we add vo_goal to wrapper?
+        self.view_of_goal = self.env.vo_goal
+        self.diagonal = self.env.diagonal
+
+    def observation(self, state):
+        # TODO: could we add these informations to wrapper?
+        #  maybe introduce a GoalWrapper that specifies the goals
+        goal = self.env.upper_right_corner if self.env.go_upper_right else self.env.lower_left_corner
+        goal = np.expand_dims(
+            ray_casting_goal(self.env.get_robot_state(), goal, self.view_of_goal, self.diagonal),
+            axis=0)
+        observation = np.concatenate((state, goal), axis=0)
+        return observation
 
 
 class TrackAdaptiveZones(gym.ObservationWrapper):
@@ -84,10 +100,11 @@ class TimeWrapper(gym.ObservationWrapper):
         super(TimeWrapper, self).__init__(env)
         self.observation_space = gym.spaces.Tuple((self.observation_space,
                                                    gym.spaces.Box(low=0.0, high=1.0, shape=(1,))))
+        self.t = 0
         self.max_time_steps = self.env.spec.max_episode_steps
 
     def reset(self):
-        self.t = 0.0
+        self.t = 0
         return super(TimeWrapper, self).reset()
 
     def observation(self, observation):
@@ -96,28 +113,28 @@ class TimeWrapper(gym.ObservationWrapper):
 
 
 class TimeWrapper2(gym.ObservationWrapper):
-
     def __init__(self, env):
         super(TimeWrapper2, self).__init__(env)
         shape = list(env.observation_space.shape)
         shape[0] = shape[0] + 1
+        # TODO: the observation space is wrong, should take low/high values from original observation space
         self.observation_space = gym.spaces.Box(low=0.0, high=1.0, shape=shape, dtype=env.observation_space.dtype)
         self.placeholder = np.empty(shape)
         self.max_time_steps = self.env.spec.max_episode_steps
         self.t = 0
 
     def reset(self):
-        obs = self.env.reset()
-        self.placeholder[0] = self.t / self.max_time_steps
-        self.placeholder[1:] = obs
-        return self.placeholder
+        self.t = 0
+        return super(TimeWrapper2, self).reset()
 
     def observation(self, observation):
-        self.t += 1
-        time = self.t / self.max_time_steps
-        self.placeholder[0] = time
+        self.placeholder[0] = self.t / self.max_time_steps
         self.placeholder[1:] = observation
         return self.placeholder
+    
+    def step(self, action):
+        self.t += 1
+        return super(TimeWrapper2, self).step(action)
 
 
 class FrameStack(gym.ObservationWrapper):
@@ -146,7 +163,7 @@ class FrameStack(gym.ObservationWrapper):
 
 class IgnorePastWallsWrapper(gym.ObservationWrapper):
     def __init__(self, env, k):
-        gym.ObservationWrapper.__init__(self, env)
+        super(IgnorePastWallsWrapper, self).__init__(env)
         shape = env.observation_space.shape
         self.observation_space = gym.spaces.Box(low=0.0, high=1.0, shape=(k + 1, shape[-1]),
                                                 dtype=env.observation_space.dtype)

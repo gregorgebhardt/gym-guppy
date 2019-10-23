@@ -7,8 +7,10 @@ import numpy as np
 from scipy.spatial import cKDTree
 
 from Box2D import b2World, b2ChainShape, b2Vec2, b2FixtureDef, b2PolygonShape
+from typing import Union
 
 from gym_guppy.guppies import Guppy
+from gym_guppy.tools.reward_function import RewardFunction, RewardFunctionBase, RewardConst, reward_registry
 from ..bodies import Body, _world_scale
 from ..guppies import Agent
 
@@ -78,6 +80,8 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
         self._screen = None
         self.render_mode = 'human'
         self.video_path = None
+
+        self._reward_function: RewardFunctionBase = RewardConst(0.0)
 
         self._configure_environment()
 
@@ -181,10 +185,14 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
     def get_observation(self, state):
         return state
 
-    # @abc.abstractmethod
+    def set_reward(self, reward_function: Union[RewardFunctionBase, str]):
+        if isinstance(reward_function, RewardFunctionBase):
+            self._reward_function = reward_function
+        else:
+            self._reward_function = eval(reward_function, reward_registry)
+
     def get_reward(self, state, action, new_state):
-        return None
-        # raise NotImplementedError
+        return self._reward_function(state, action, new_state)
 
     def has_finished(self, state, action):
         return False
