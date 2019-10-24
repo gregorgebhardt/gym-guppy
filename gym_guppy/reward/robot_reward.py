@@ -50,11 +50,6 @@ def leadership_bonus(state, _action, next_state, robot_id):
     return reward
 
 
-@reward_function_with_args
-def cosine_similarity_with_leadership_bonus_reward(state, _action, next_state, bonus_factor):
-    return cosine_similarity_reward(next_state, state) + bonus_factor * leadership_bonus(next_state, state)
-
-
 @reward_function
 @njit
 def follow_reward(state, _action, next_state):
