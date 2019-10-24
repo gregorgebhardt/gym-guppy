@@ -1,5 +1,5 @@
 import abc
-from functools import wraps, update_wrapper
+from functools import update_wrapper
 
 import numpy as np
 from typing import Callable, Any, Tuple, Union
@@ -10,6 +10,8 @@ _RewardWrapperT = Callable[[float, Any], float]
 _InputWrapperT = Callable[[np.ndarray, np.ndarray, np.ndarray, Any], Tuple[np.ndarray, np.ndarray, np.ndarray]]
 
 reward_registry = {}
+
+# TODO: move registration of Reward-Function to init of RewardFunction?
 
 
 def reward_function(f: _RewardFunctionT):

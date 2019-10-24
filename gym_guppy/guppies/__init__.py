@@ -3,6 +3,7 @@ from ._guppy import Guppy
 from ._robot import Robot, TurnBoostRobot, GoToRobot
 from ._couzin_guppies import ClassicCouzinGuppy, BoostCouzinGuppy, AdaptiveCouzinGuppy, BiasedAdaptiveCouzinGuppy
 from ._adaptive_agent import AdaptiveAgent
+from ._randomized_guppies import RandomizedCouzinGuppy
 
 import importlib.util
 spec = importlib.util.find_spec('mxnet')

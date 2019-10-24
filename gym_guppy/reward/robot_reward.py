@@ -46,8 +46,7 @@ def leadership_bonus(state, _action, next_state, robot_id):
     # norm_before = np.sqrt(np.sum(actor_before - env_agents_before, axis=1) ** 2)
     # norm_after = np.sqrt(np.sum(actor_before - env_agents_now, axis=1) ** 2)
     difference = norm_before - norm_after
-    reward = np.mean(difference)
-    return reward
+    return np.mean(difference)
 
 
 @reward_function_with_args
@@ -66,8 +65,7 @@ def follow_reward(state, _action, next_state):
     # norm_b = np.sqrt(np.sum(directions_to_actor ** 2, axis=1))
     follow_metric = inner / norm_b
     follow_metric[np.isnan(follow_metric)] = 0
-    reward = np.mean(follow_metric)
-    return reward
+    return np.mean(follow_metric)
 
 
 @reward_function
@@ -79,8 +77,7 @@ def fish_to_robot_reward(state, _action, next_state):
     norm_before = np.sqrt(np.sum((actor_before - env_agents_before) ** 2, axis=1))
     norm_after = np.sqrt(np.sum((actor_before - env_agents_now) ** 2, axis=1))
     difference = norm_before - norm_after
-    reward = np.mean(difference)
-    return reward
+    return np.mean(difference)
 
 
 def clipped_proximity_bonus(new_state, clip_value):
@@ -96,5 +93,12 @@ def clipped_proximity_bonus(new_state, clip_value):
 def proximity_to_center_reward(_state, _action, next_state, half_diagonal):
     env_agents_coordinates = next_state[1:, :2]
     norm_to_center = np.sqrt(np.sum(env_agents_coordinates ** 2, axis=1))
-    reward = (half_diagonal - np.mean(norm_to_center)) / half_diagonal
-    return reward
+    return (half_diagonal - np.mean(norm_to_center)) / half_diagonal
+
+
+def distance_to_fish(new_state):
+    # TODO: this function assumes, the robot position is always in the first row
+    #  reuse code from guppy_gym, e.g., tools.math.get_local_poses
+    fish_coordinates = new_state[1:, :2]
+    robot_coordinates = new_state[0, :2]
+    return np.linalg.norm(robot_coordinates - fish_coordinates)
