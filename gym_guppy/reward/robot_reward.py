@@ -16,24 +16,6 @@ def negative_distance_to_swarm(_state, _action, next_state, robot_id):
 
 @reward_function_with_args
 @njit
-def cosine_similarity_reward(state, _action, next_state, robot_id):
-    env_agents_before = np.array([s[:2] for i, s in enumerate(state) if i != robot_id])
-    env_agents_now = np.array([s[:2] for i, s in enumerate(next_state) if i != robot_id])
-    swim_directions = env_agents_now - env_agents_before
-    directions_to_actor = state[robot_id, :2] - env_agents_before
-    # inner = np.sum(swim_directions * directions_to_actor, axis=1)
-    inner = swim_directions.dot(directions_to_actor)
-    norm_a = row_norm(swim_directions)
-    norm_b = row_norm(directions_to_actor)
-    # norm_a = np.sqrt(np.sum(swim_directions ** 2, axis=1))
-    # norm_b = np.sqrt(np.sum(directions_to_actor ** 2, axis=1))
-    cosine_sim = inner / (norm_a * norm_b)
-    cosine_sim[np.isnan(cosine_sim)] = 0
-    return np.mean(cosine_sim)
-
-
-@reward_function_with_args
-@njit
 def leadership_bonus(state, _action, next_state, robot_id):
     actor_before = state[robot_id, :2]
     env_agents_before = np.array([s[:2] for i, s in enumerate(state) if i != robot_id])
