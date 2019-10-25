@@ -1,13 +1,11 @@
 import abc
-import enum
-from typing import List
 import warnings
 
 import gym
 import numpy as np
 from scipy.spatial.ckdtree import cKDTree
 
-from gym_guppy.guppies import Guppy, Agent, GoToRobot
+from gym_guppy.guppies import Agent, GoToRobot, Guppy
 from gym_guppy.tools import Feedback
 from gym_guppy.tools.math import is_point_left, normalize, rotation
 
@@ -25,10 +23,10 @@ class AdaptiveAgent(GoToRobot, Guppy):
 
     @property
     def action_space(self) -> gym.spaces.Box:
-        return gym.spaces.Box(shape=tuple())
+        return gym.spaces.Box(high=np.inf, low=-np.inf, shape=tuple())
 
     def set_action(self, action):
-        warnings.warn("The adaptive agent does not accept any agents and should be added as guppy to the env.")
+        warnings.warn("The adaptive agent does not accept any action and should be added as guppy to the env.")
 
     def compute_next_action(self, state: np.ndarray, kd_tree: cKDTree = None):
         robot_pose = state[self.id]
@@ -64,6 +62,10 @@ class MillingState(AdaptiveState):
         self._mill_index = 0
 
     def compute_next_action(self, agent: Agent, feedback: Feedback, state: np.ndarray, kd_tree: cKDTree = None):
+        # TODO implement
+        pass
+
+    def switch_state(self) -> "AdaptiveState":
         # TODO implement
         pass
 
@@ -119,10 +121,10 @@ class LeadState(AdaptiveState):
     _target_radius = 0.05
     _max_lead_dist = 0.1
 
-    _targets = np.array([[ 0.4,  0.4],
-                         [ 0.4, -0.4],
+    _targets = np.array([[0.4, 0.4],
+                         [0.4, -0.4],
                          [-0.4, -0.4],
-                         [-0.4,  0.4]])
+                         [-0.4, 0.4]])
 
     def __init__(self):
         super().__init__()

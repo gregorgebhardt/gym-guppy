@@ -1,18 +1,15 @@
 import abc
 import warnings
-
-import gym
-
-import numpy as np
-from scipy.spatial import cKDTree
-
-from Box2D import b2World, b2ChainShape, b2Vec2, b2FixtureDef, b2PolygonShape
 from typing import Union
 
-from gym_guppy.guppies import Guppy
-from gym_guppy.tools.reward_function import RewardFunction, RewardFunctionBase, RewardConst, reward_registry
-from ..bodies import Body, _world_scale
-from ..guppies import Agent
+import gym
+import numpy as np
+from Box2D import b2PolygonShape, b2Vec2, b2World
+from scipy.spatial import cKDTree
+
+from gym_guppy.bodies import Body, _world_scale
+from gym_guppy.guppies import Agent, Guppy
+from gym_guppy.tools.reward_function import RewardConst, RewardFunctionBase, reward_registry
 
 
 class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
@@ -30,7 +27,7 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
     __sim_position_iterations = 3
     __steps_per_action = 10
 
-    def __new__(cls, **kwargs):
+    def __new__(cls, *args, **kwargs):
         cls.sim_steps_per_second = cls.__sim_steps_per_second
         cls.sim_step = 1. / cls.__sim_steps_per_second
         cls.world_x_range = -cls.world_width / 2, cls.world_width / 2
@@ -38,20 +35,33 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
         cls.world_bounds = (np.array([-cls.world_width / 2, -cls.world_height / 2]),
                             np.array([cls.world_width / 2, cls.world_height / 2]))
 
+        # TODO: wrap __init__
+        cls.__old_init__ = cls.__init__
+
+        def wrapped__init__(self: cls, *_args, **_kwargs):
+            self.__old_init__(*_args, **_kwargs)
+
+            # TODO: do we need to call this here?
+            self._reset()
+
+            self.action_space = self._get_action_space()
+            self.observation_space = self._get_observation_space()
+            self.state_space = self._get_state_space()
+
+            self._step_world()
+
+        cls.__init__ = wrapped__init__
+
         return super(GuppyEnv, cls).__new__(cls)
 
-    def __init__(self, **kwargs):
+    def __init__(self, *args, **kwargs):
+        super(GuppyEnv, self).__init__(*args, **kwargs)
         self.__sim_steps = 0
         self.__reset_counter = 0
 
         # create the world in Box2D
         self.world = b2World(gravity=(0, 0), doSleep=True)
         self.tank = self.world.CreateStaticBody(position=(.0, .0))
-        # self.tank.CreateFixture(
-        #     shape=b2ChainShape(vertices=[(_world_scale * self.world_x_range[0], _world_scale * self.world_y_range[1]),
-        #                                  (_world_scale * self.world_x_range[0], _world_scale * self.world_y_range[0]),
-        #                                  (_world_scale * self.world_x_range[1], _world_scale * self.world_y_range[0]),
-        #                                  (_world_scale * self.world_x_range[1], _world_scale * self.world_y_range[1])]))
 
         wall_shape = b2PolygonShape()
         wall_width = .05
@@ -72,6 +82,8 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
         self.__agents: [Agent] = []
         self.__robots_idx: [int] = []
         self.__guppies_idx: [int] = []
+        # self.__robot: Union[Robot, None] = None
+        # self.__guppies: [Guppy] = []
 
         self.__objects: [Body] = []
 
@@ -83,13 +95,18 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
 
         self._reward_function: RewardFunctionBase = RewardConst(0.0)
 
-        self._configure_environment()
+        self.action_space = None
+        self.observation_space = None
+        self.state_space = None
 
-        self.action_space = self._get_action_space()
-        self.observation_space = self._get_observation_space()
-        self.state_space = self._get_state_space()
-
-        self._step_world()
+        # remove, since we wrap now the __init__ function
+        # self._configure_environment()
+        #
+        # self.action_space = self._get_action_space()
+        # self.observation_space = self._get_observation_space()
+        # self.state_space = self._get_state_space()
+        #
+        # self._step_world()
 
     @property
     def _sim_steps(self):
@@ -110,6 +127,7 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
     @property
     def guppies(self):
         return (self.__agents[g_idx] for g_idx in self.__guppies_idx)
+        # return tuple(self.__guppies)
 
     @property
     def guppy_idx(self):
@@ -175,10 +193,6 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
     def _add_object(self, body: Body):
         self.__objects.append(body)
 
-    @abc.abstractmethod
-    def _configure_environment(self):
-        pass
-
     def get_state(self):
         return np.array([a.get_state() for a in self.__agents])
 
@@ -217,11 +231,15 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
             self.__seed = seed
         return [self.__seed]
 
+    @abc.abstractmethod
+    def _reset(self):
+        pass
+
     def reset(self):
         self.__reset_counter += 1
         self.destroy()
-        self._configure_environment()
         self.__sim_steps = 0
+        self._reset()
 
         # step to resolve
         self._step_world()
@@ -240,9 +258,7 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
         for r, a in zip(self.robots, action):
             r.set_action(a)
 
-        # step guppies
-        for i, g in enumerate(self.guppies):
-            g.compute_next_action(state=state, kd_tree=self.kd_tree)
+        self._compute_guppy_actions(state)
             
         for i in range(self.__steps_per_action):
             for a in self.__agents:
@@ -261,9 +277,12 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
         # state
         next_state = self.get_state()
         # assert self.state_space.contains(next_state)
+
+        # update KD-tree
+        self._update_kdtree(next_state)
         
         # observation
-        observation = self.get_observation(next_state.copy())
+        observation = self.get_observation(next_state)
 
         # reward
         reward = self.get_reward(state, action, next_state)
@@ -274,17 +293,21 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
         # info
         info = self.get_info(next_state, action)
 
-        # update KD-tree
-        self.kd_tree = cKDTree(next_state[:, :2])
-
         return observation, reward, done, info
+
+    def _update_kdtree(self, state):
+        self.kd_tree = cKDTree(state[:, :2])
+
+    def _compute_guppy_actions(self, state):
+        for i, g in enumerate(self.guppies):
+            g.compute_next_action(state=state, kd_tree=self.kd_tree)
 
     def _step_world(self):
         self.world.Step(self.sim_step, self.__sim_velocity_iterations, self.__sim_position_iterations)
         self.world.ClearForces()
 
         state = self.get_state()
-        self.kd_tree = cKDTree(state[:, :2])
+        self._update_kdtree(state)
 
     def render(self, mode=None, fps=25):
         # if close:
@@ -343,6 +366,22 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
 
     def _draw_on_top(self, screen):
         pass
+
+
+class GoalGuppyEnv(GuppyEnv, abc.ABC):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self._goal = None
+
+    def get_state(self):
+        return super(GoalGuppyEnv, self).get_state(), self._goal
+
+    def _update_kdtree(self, state):
+        super(GoalGuppyEnv, self)._update_kdtree(state[0])
+
+    def _compute_guppy_actions(self, state):
+        super(GoalGuppyEnv, self)._compute_guppy_actions(state[0])
 
 
 class UnknownObjectException(Exception):

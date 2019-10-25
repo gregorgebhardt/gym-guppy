@@ -1,6 +1,6 @@
 import numpy as np
 
-from gym_guppy import BiasedAdaptiveCouzinGuppy
+from gym_guppy.guppies import BiasedAdaptiveCouzinGuppy
 
 
 class RandomizedCouzinGuppy(BiasedAdaptiveCouzinGuppy):

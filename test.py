@@ -14,12 +14,15 @@ h5file = '/Users/gregor/Downloads/data/training/eyj_2_lstm_100_zero_30_live_fema
 
 
 class TestEnv(GuppyEnv):
-    def _configure_environment(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def _reset(self):
         self._steps_per_action = 4
         adaptive_agent = AdaptiveAgent(world=self.world, world_bounds=self.world_bounds)
         self._add_guppy(adaptive_agent)
-        # self._add_robot(TurnBoostRobot(world=self.world, world_bounds=self.world_bounds,
-        #                                position=np.array([-0.4980772, -0.30953531]), orientation=1.5089165))
+        self._add_robot(TurnBoostRobot(world=self.world, world_bounds=self.world_bounds,
+                                       position=np.array([-0.4980772, -0.30953531]), orientation=1.5089165))
 
         num_guppies = 5
         # random initialization
@@ -64,11 +67,12 @@ class TestEnv(GuppyEnv):
 
 
 if __name__ == '__main__':
-    env = LocalObservationsWrapper(TestEnv())
+    # env = LocalObservationsWrapper(TestEnv())
+    env = TestEnv()
     env.reset()
     env.video_path = 'video_out'
 
     for t in range(2000):
         env.render(mode='human')
 
-        state_t, reward_t, done, info = env.step(np.array([[1.366212, 0.859359]]))
+        state_t, reward_t, done, info = env.step(np.array([1.366212, 0.859359]))
