@@ -9,6 +9,14 @@ from gym_guppy.tools.math import row_norm
 @reward_function_with_args
 @njit
 def negative_distance_to_swarm(_state, _action, next_state, robot_id):
+    """
+    TODO: documentation
+    :param _state:
+    :param _action:
+    :param next_state:
+    :param robot_id:
+    :return:
+    """
     robot_state = next_state[robot_id, :]
     swarm_state = np.array([s for i, s in enumerate(next_state) if i != robot_id])
     return [-1 * np.sum(row_norm(swarm_state - robot_state))]
@@ -17,14 +25,20 @@ def negative_distance_to_swarm(_state, _action, next_state, robot_id):
 @reward_function_with_args
 @njit
 def follow_reward(state, _action, next_state, robot_id):
+    """
+    TODO: documentation
+    :param state:
+    :param _action:
+    :param next_state:
+    :param robot_id:
+    :return:
+    """
     env_agents_before = np.array([s[:2] for i, s in enumerate(state) if i != robot_id])
     env_agents_now = np.array([s[:2] for i, s in enumerate(next_state) if i != robot_id])
     swim_directions = env_agents_now - env_agents_before
     directions_to_actor = state[robot_id, :2] - env_agents_before
     inner = swim_directions.dot(directions_to_actor)
-    # inner = np.sum(swim_directions * directions_to_actor, axis=1)
     norm_b = row_norm(directions_to_actor)
-    # norm_b = np.sqrt(np.sum(directions_to_actor ** 2, axis=1))
     follow_metric = inner / norm_b
     follow_metric[np.isnan(follow_metric)] = 0
     reward = np.mean(follow_metric)
@@ -34,6 +48,14 @@ def follow_reward(state, _action, next_state, robot_id):
 @reward_function_with_args
 @njit
 def fish_to_robot_reward(state, _action, next_state, robot_id):
+    """
+    TODO: documentation
+    :param state:
+    :param _action:
+    :param next_state:
+    :param robot_id:
+    :return:
+    """
     env_agents_before = np.array([s[:2] for i, s in enumerate(state) if i != robot_id])
     env_agents_now = np.array([s[:2] for i, s in enumerate(next_state) if i != robot_id])
     actor_before = state[robot_id, :2]
@@ -41,6 +63,7 @@ def fish_to_robot_reward(state, _action, next_state, robot_id):
     norm_after = row_norm(actor_before - env_agents_now)
     difference = norm_before - norm_after
     return np.mean(difference)
+
 
 @reward_function_with_args
 def clipped_proximity_bonus(state, clip_value, robot_id):
@@ -54,7 +77,7 @@ def clipped_proximity_bonus(state, clip_value, robot_id):
 @reward_function_with_args
 @njit
 def proximity_to_center_reward(_state, _action, next_state, half_diagonal, robot_id):
-    env_agents_coordinates = np.array([s[:2] for i, s in enumerate(new_state) if i != robot_id])
+    env_agents_coordinates = np.array([s[:2] for i, s in enumerate(next_state) if i != robot_id])
     norm_to_center = row_norm(env_agents_coordinates)
     return (half_diagonal - np.mean(norm_to_center)) / half_diagonal
 
