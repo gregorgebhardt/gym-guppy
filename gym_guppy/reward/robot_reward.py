@@ -23,7 +23,7 @@ def negative_distance_to_swarm(_state, _action, next_state, robot_id):
     
 
 @reward_function_with_args
-@njit
+# @njit
 def follow_reward(state, _action, next_state, robot_id):
     """
     TODO: documentation
@@ -33,14 +33,15 @@ def follow_reward(state, _action, next_state, robot_id):
     :param robot_id:
     :return:
     """
-    env_agents_before = np.array([s[:2] for i, s in enumerate(state) if i != robot_id])
-    env_agents_now = np.array([s[:2] for i, s in enumerate(next_state) if i != robot_id])
+    env_agents_before = np.concatenate((state[:robot_id, :2], state[robot_id+1:, :2]))
+    env_agents_now = np.concatenate((next_state[:robot_id, :2], next_state[robot_id + 1:, :2]))
     swim_directions = env_agents_now - env_agents_before
     directions_to_actor = state[robot_id, :2] - env_agents_before
-    inner = swim_directions.dot(directions_to_actor)
+    inner = swim_directions.dot(directions_to_actor.T)
     norm_b = row_norm(directions_to_actor)
     follow_metric = inner / norm_b
-    follow_metric[np.isnan(follow_metric)] = 0
+    # follow_metric[np.isnan(follow_metric)] = 0
+    follow_metric = np.where(np.isnan(follow_metric), .0, follow_metric)
     reward = np.mean(follow_metric)
     return reward
 

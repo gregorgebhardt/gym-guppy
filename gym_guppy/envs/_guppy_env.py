@@ -27,19 +27,11 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
     __sim_position_iterations = 3
     __steps_per_action = 10
 
-    def __new__(cls, *args, **kwargs):
-        cls.sim_steps_per_second = cls.__sim_steps_per_second
-        cls.sim_step = 1. / cls.__sim_steps_per_second
-        cls.world_x_range = -cls.world_width / 2, cls.world_width / 2
-        cls.world_y_range = -cls.world_height / 2, cls.world_height / 2
-        cls.world_bounds = (np.array([-cls.world_width / 2, -cls.world_height / 2]),
-                            np.array([cls.world_width / 2, cls.world_height / 2]))
-
-        # TODO: wrap __init__
-        cls.__old_init__ = cls.__init__
+    def __init_subclass__(cls, **kwargs):
+        old_init = cls.__init__
 
         def wrapped__init__(self: cls, *_args, **_kwargs):
-            self.__old_init__(*_args, **_kwargs)
+            old_init(self, *_args, **_kwargs)
 
             # TODO: do we need to call this here?
             self._reset()
@@ -51,6 +43,14 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
             self._step_world()
 
         cls.__init__ = wrapped__init__
+
+    def __new__(cls, *args, **kwargs):
+        cls.sim_steps_per_second = cls.__sim_steps_per_second
+        cls.sim_step = 1. / cls.__sim_steps_per_second
+        cls.world_x_range = -cls.world_width / 2, cls.world_width / 2
+        cls.world_y_range = -cls.world_height / 2, cls.world_height / 2
+        cls.world_bounds = (np.array([-cls.world_width / 2, -cls.world_height / 2]),
+                            np.array([cls.world_width / 2, cls.world_height / 2]))
 
         return super(GuppyEnv, cls).__new__(cls)
 
