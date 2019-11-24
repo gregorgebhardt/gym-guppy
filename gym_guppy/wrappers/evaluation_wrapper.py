@@ -82,19 +82,21 @@ class OmniscienceWrapper(gym.Wrapper):
         gym.Wrapper.__init__(self, env)
         num_guppies = env.num_guppies
         # TODO: Time left, DR Parameters
-        self.observation_space = gym.spaces.Tuple((env.observation_space,
-                                                   gym.spaces.Box(low=0.0, high=np.inf, shape=(num_guppies *(3 + 6) + 1,))))
+        self.observation_space = gym.spaces.Dict(dict(
+                visible_for_all=env.observation_space, 
+                only_for_critic=gym.spaces.Box(low=0.0, high=np.inf, shape=(num_guppies *(3 + 6) + 1,)))
+                )
         self.max_time_steps = self.env.spec.max_episode_steps
 
     def reset(self):
         self.t = 0
         state = self.env.reset()
-        return (state, self._get_information())
+        return dict(visible_for_all=state, only_for_critic=self._get_information())
 
     def step(self, action):
         self.t += 1
         state, reward, done, info = self.env.step(action)
-        return (state, self._get_information()), reward, done, info
+        return dict(visible_for_all=state, only_for_critic=self._get_information()), reward, done, info
 
     def _get_information(self):
         dr_parameters = np.array \
