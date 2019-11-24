@@ -3,6 +3,7 @@ import warnings
 from typing import Union
 
 import gym
+from gym import spaces
 import numpy as np
 from Box2D import b2PolygonShape, b2Vec2, b2World
 from scipy.spatial import cKDTree
@@ -10,6 +11,9 @@ from scipy.spatial import cKDTree
 from gym_guppy.bodies import Body, _world_scale
 from gym_guppy.guppies import Agent, Guppy
 from gym_guppy.tools.reward_function import RewardConst, RewardFunctionBase, reward_registry
+
+from functools import partial
+
 
 
 class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
@@ -367,21 +371,75 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
     def _draw_on_top(self, screen):
         pass
 
+MARGIN = 0.2
 
-class GoalGuppyEnv(GuppyEnv, abc.ABC):
+def add_rewards(base_reward, goal_reward, alpha):
+    return (1 - alpha) * base_reward + alpha * goal_reward
+
+def multiply_rewards(base_reward, goal_reward):
+    return base_reward * goal_reward
+
+
+class GoalGuppyEnv1(GuppyEnv, abc.ABC):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.observation_space = spaces.Dict(dict(
+            desired_goal=spaces.Box(*self.world_bounds, dtype='float32'),
+            achieved_goal=spaces.Box(*self.world_bounds, dtype='float32'),
+            observation=super().observation_space,
+        ))
+        self.goal_buffer = np.concatenate(self.world_bounds)
+        self._reward_combiner = partial(add_rewards, alpha=0.5)
 
-        self._goal = None
+    def reset(self):
+        observation = super().reset()
+        self._goal_idx = np.random.choice(range(4)) # Maybe go to nearest first instead?
+        desired_goal = self._get_desired_goal()
+        achieved_goal = self._compute_achieved_goal()
+        self.distance_before = np.linalg.norm(desired_goal - achieved_goal)
+        return dict(observation=observation, desired_goal=desired_goal, achieved_goal=achieved_goal)
 
     def get_state(self):
-        return super(GoalGuppyEnv, self).get_state(), self._goal
+        return super().get_state(), self._get_desired_goal()
 
-    def _update_kdtree(self, state):
-        super(GoalGuppyEnv, self)._update_kdtree(state[0])
+    def _compute_goal_reward(self, achieved_goal, desired_goal, info=None):
+        distance_now = np.linalg.norm(desired_goal - achieved_goal)
+        reward = self.distance_before - distance_now # TODO: Maybe clip
+        self.distance_before = distance_now
+        return reward
 
-    def _compute_guppy_actions(self, state):
-        super(GoalGuppyEnv, self)._compute_guppy_actions(state[0])
+    def _get_desired_goal(self):
+        return self.goal_buffer[[self._goal_idx, (self._goal_idx + 1) % 4]]
+
+    def _maybe_change_desired_goal(self, achieved_goal):
+        desired_goal = self._get_desired_goal()
+        if np.linalg.norm(desired_goal - achieved_goal) <= MARGIN:
+            self._goal_idx = (self._goal_idx + 1) % 4
+        
+    def _compute_achieved_goal(self):
+        mean_fish_position = np.mean(np.array([s[:2] for i, s in enumerate(self.get_state()[0]) if i != self.robots_idx[0]]), axis=0)
+        return mean_fish_position
+
+    def set_reward_combiner(self, reward_combiner, **kwargs):
+        self._reward_combiner = partial(reward_combiner, **kwargs)
+
+    def step(self, action):
+        observation, base_reward, done, info = super().step(action)
+        achieved_goal = self._compute_achieved_goal()
+        goal_reward = self._compute_goal_reward(achieved_goal, self._get_desired_goal(), info)
+        total_reward = self._reward_combiner(base_reward, goal_reward)
+        self._maybe_change_desired_goal(achieved_goal)
+        full_observation = dict(
+            observation=observation, desired_goal=self._get_desired_goal(), achieved_goal=achieved_goal)
+        return full_observation, total_reward, done, info
+
+# TODO: Find out what Gregor had in mind with this
+#    def _update_kdtree(self, state):
+#        super(GoalGuppyEnv, self)._update_kdtree(state[0])
+#
+#    def _compute_guppy_actions(self, state):
+#        super(GoalGuppyEnv, self)._compute_guppy_actions(state[0])
+
 
 
 class UnknownObjectException(Exception):
