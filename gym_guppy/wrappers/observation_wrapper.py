@@ -51,6 +51,7 @@ class RayCastingWrapper(gym.ObservationWrapper):
 
 
 class AddGoalWrapper(gym.ObservationWrapper):
+    """Deprecated in favor of RayCastingGoalWrapper. Only usable with pre-GoalEnv-Environments"""
     def __init__(self, env):
         print('Adding Goal to observation')
         super(AddGoalWrapper, self).__init__(env)
@@ -69,6 +70,24 @@ class AddGoalWrapper(gym.ObservationWrapper):
             ray_casting_goal(self.env.get_robot_state(), goal, self.view_of_goal, self.diagonal),
             axis=0)
         observation = np.concatenate((state, goal), axis=0)
+        return observation
+
+
+class RayCastingGoalWrapper(gym.ObservationWrapper):
+    def __init__(self, env):
+        super(RayCastingGoalWrapper, self).__init__(env)
+        shape = list(env.observation_space['observation'].shape)
+        shape[0] = shape[0] + 1
+        self.observation_space = gym.spaces.Box(low=0.0, high=1.0, shape=shape, dtype=env.observation_space['observation'].dtype)
+        # TODO: could we add vo_goal to wrapper?
+        self.view_of_goal = self.env.env.vo_goal
+        self.diagonal = self.env.env.diagonal
+
+    def observation(self, state):
+        goal = np.expand_dims(
+            ray_casting_goal(self.env.env.get_state()[self.env.env.robots_idx[0]], state['desired_goal'], self.view_of_goal, self.diagonal),
+            axis=0)
+        observation = np.concatenate((state['observation'], goal), axis=0)
         return observation
 
 
