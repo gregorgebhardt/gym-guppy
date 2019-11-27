@@ -29,65 +29,42 @@ class LocalObservationsWrapper(gym.ObservationWrapper):
 class RayCastingWrapper(gym.ObservationWrapper):
     def __init__(self, env, degrees=360, num_bins=36 * 2):
         super(RayCastingWrapper, self).__init__(env)
+        # redefine observation space
         self.observation_space = gym.spaces.Box(low=0.0, high=1.0, shape=(2, num_bins), dtype=np.float32)
+
+        # TODO: test if this leads to the same results
         self.world_bounds = np.float32((self.env.world_bounds[0], self.env.world_bounds[1]))
+        self.world_bounds = np.float32(self.env.world_bounds)
+
         self.diagonal = np.linalg.norm(self.world_bounds[0] - self.world_bounds[1])
         self.cutoff = np.radians(degrees) / 2.0
-        self.vo_agents, self.vo_walls = self._prepare_view_bins((degrees, num_bins), (degrees, num_bins))
+        self.sector_bounds = np.linspace(-self.cutoff, self.cutoff, num_bins + 1, dtype=np.float32)
+        self.ray_directions = np.linspace(-self.cutoff, self.cutoff, num_bins, dtype=np.float32)
+        # TODO: is this faster than just recreating the array?
         self.obs_placeholder = np.empty(self.observation_space.shape)
-        self.env.vo_goal = self.vo_agents
 
     def observation(self, state):
-        self.obs_placeholder[0] = ray_casting_agents(state[0], state[1:], self.vo_agents, self.diagonal)
-        self.obs_placeholder[1] = ray_casting_walls(state[0], self.world_bounds, self.vo_walls, self.diagonal)
+        self.obs_placeholder[0] = ray_casting_agents(state[0], state[1:], self.sector_bounds, self.diagonal)
+        self.obs_placeholder[1] = ray_casting_walls(state[0], self.world_bounds, self.ray_directions, self.diagonal)
         return self.obs_placeholder
-
-    def _prepare_view_bins(self, view_of_agents, view_of_walls):
-        fop, view_of_agents_size = view_of_agents
-        view_of_agents_sectors = np.linspace(-self.cutoff, self.cutoff, view_of_agents_size + 1, dtype=np.float32)
-        fop, view_of_walls_size = view_of_walls
-        view_of_walls_rays = np.linspace(-self.cutoff, self.cutoff, view_of_walls_size, dtype=np.float32)
-        return view_of_agents_sectors, view_of_walls_rays
-
-
-class AddGoalWrapper(gym.ObservationWrapper):
-    """Deprecated in favor of RayCastingGoalWrapper. Only usable with pre-GoalEnv-Environments"""
-    def __init__(self, env):
-        print('Adding Goal to observation')
-        super(AddGoalWrapper, self).__init__(env)
-        shape = list(env.observation_space.shape)
-        shape[0] = shape[0] + 1
-        self.observation_space = gym.spaces.Box(low=0.0, high=1.0, shape=shape, dtype=env.observation_space.dtype)
-        # TODO: could we add vo_goal to wrapper?
-        self.view_of_goal = self.env.vo_goal
-        self.diagonal = self.env.diagonal
-
-    def observation(self, state):
-        # TODO: could we add these informations to wrapper?
-        #  maybe introduce a GoalWrapper that specifies the goals
-        goal = self.env.upper_right_corner if self.env.go_upper_right else self.env.lower_left_corner
-        goal = np.expand_dims(
-            ray_casting_goal(self.env.get_robot_state(), goal, self.view_of_goal, self.diagonal),
-            axis=0)
-        observation = np.concatenate((state, goal), axis=0)
-        return observation
 
 
 class RayCastingGoalWrapper(gym.ObservationWrapper):
-    def __init__(self, env):
+    def __init__(self, env, sector_bounds):
         super(RayCastingGoalWrapper, self).__init__(env)
+        # redefine observation space
         shape = list(env.observation_space['observation'].shape)
         shape[0] = shape[0] + 1
         self.observation_space = gym.spaces.Box(low=0.0, high=1.0, shape=shape, dtype=env.observation_space['observation'].dtype)
-        # TODO: could we add vo_goal to wrapper?
-        self.view_of_goal = self.env.env.vo_goal
-        self.diagonal = self.env.env.diagonal
 
-    def observation(self, state):
-        goal = np.expand_dims(
-            ray_casting_goal(self.env.env.get_state()[self.env.env.robots_idx[0]], state['desired_goal'], self.view_of_goal, self.diagonal),
-            axis=0)
-        observation = np.concatenate((state['observation'], goal), axis=0)
+        self.sector_bounds = sector_bounds
+        self.diagonal = np.linalg.norm(self.env.world_bounds[0] - self.env.world_bounds[1])
+
+    def observation(self, observation):
+        rc_goal = ray_casting_goal(self.get_robots_state()[0], observation['desired_goal'],
+                                   self.sector_bounds, self.diagonal)
+        goal = np.expand_dims(rc_goal, axis=0)
+        observation = np.concatenate((observation['observation'], goal), axis=0)
         return observation
 
 

@@ -1,4 +1,4 @@
 from .action_wrapper import DiscreteActionWrapper, FlatActionWrapper, MovementLimitWrapper, NormalizeActionWrapper
 from .observation_wrapper import LocalObservationsWrapper, RayCastingWrapper, FrameStack, IgnorePastWallsWrapper, \
-    TrackAdaptiveZones, TimeWrapper, TimeWrapper2, RayCastingGoalWrapper, AddGoalWrapper
+    TrackAdaptiveZones, TimeWrapper, TimeWrapper2, RayCastingGoalWrapper
 from .evaluation_wrapper import EvaluationWrapper, OmniscienceWrapper
