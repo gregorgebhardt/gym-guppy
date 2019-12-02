@@ -4,8 +4,7 @@ import gym
 import numpy as np
 
 from gym_guppy.guppies import AdaptiveCouzinGuppy
-from gym_guppy.tools.math import get_local_poses, transform_sin_cos, ray_casting_walls, ray_casting_agents, \
-    ray_casting_goal
+from gym_guppy.tools.math import get_local_poses, transform_sin_cos, ray_casting_walls, compute_dist_bins
 from gym_guppy.tools.datastructures import LazyFrames
 
 
@@ -44,7 +43,7 @@ class RayCastingWrapper(gym.ObservationWrapper):
         self.obs_placeholder = np.empty(self.observation_space.shape)
 
     def observation(self, state):
-        self.obs_placeholder[0] = ray_casting_agents(state[0], state[1:], self.sector_bounds, self.diagonal)
+        self.obs_placeholder[0] = compute_dist_bins(state[0], state[1:], self.sector_bounds, self.diagonal)
         self.obs_placeholder[1] = ray_casting_walls(state[0], self.world_bounds, self.ray_directions, self.diagonal)
         return self.obs_placeholder
 
@@ -61,8 +60,8 @@ class RayCastingGoalWrapper(gym.ObservationWrapper):
         self.diagonal = np.linalg.norm(self.env.world_bounds[0] - self.env.world_bounds[1])
 
     def observation(self, observation):
-        rc_goal = ray_casting_goal(self.get_robots_state()[0], observation['desired_goal'],
-                                   self.sector_bounds, self.diagonal)
+        rc_goal = compute_dist_bins(self.get_robots_state()[0], observation['desired_goal'].reshape((1, 2)),
+                                    self.sector_bounds, self.diagonal)
         goal = np.expand_dims(rc_goal, axis=0)
         observation = np.concatenate((observation['observation'], goal), axis=0)
         return observation

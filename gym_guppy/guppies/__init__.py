@@ -8,6 +8,9 @@ from ._randomized_guppies import RandomizedCouzinGuppy
 import importlib.util
 spec = importlib.util.find_spec('mxnet')
 if spec is None:
-    print("You need to install `mxnet` to use MXNetGuppy, you can use `pip install mxnet`")
+    class MXNetGuppy(Guppy):
+        def __init__(self, *, hdf_file, **kwargs):
+            raise ModuleNotFoundError("You need to install `mxnet` to use MXNetGuppy, you can use `pip install mxnet`")
+
 else:
     from ._mxnet_guppies import MXNetGuppy

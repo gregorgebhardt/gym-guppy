@@ -8,7 +8,7 @@ import numpy as np
 from scipy.spatial.ckdtree import cKDTree
 
 from gym_guppy.guppies import Agent, Guppy, TurnSpeedAgent
-from gym_guppy.tools.math import ray_casting_agents, ray_casting_walls
+from gym_guppy.tools.math import compute_dist_bins, ray_casting_walls
 
 
 class MXNetGuppy(Guppy, TurnSpeedAgent, ABC):
@@ -68,7 +68,7 @@ class MXNetGuppy(Guppy, TurnSpeedAgent, ABC):
         #     print(f'pose error: {pos_diff - self._locomotion[0, 1]}, {ori_diff - self._locomotion[0, 0]}')
         # self._last_pose = pose
 
-        rc_agents = ray_casting_agents(pose, state[i[1:], :], self._agents_sectors, self._far_plane).reshape(1, -1)
+        rc_agents = compute_dist_bins(pose, state[i[1:], :], self._agents_sectors, self._far_plane).reshape(1, -1)
         rc_walls = ray_casting_walls(pose, self._world_bounds, self._wall_rays, self._far_plane).reshape(1, -1)
         rc_walls = np.maximum(rc_walls, .0)
 
