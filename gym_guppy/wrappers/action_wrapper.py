@@ -18,11 +18,13 @@ class NormalizeActionWrapper(gym.ActionWrapper):
 class FlatActionWrapper(gym.ActionWrapper):
     def __init__(self, env):
         super(FlatActionWrapper, self).__init__(env)
+        self._original_action_space = self.action_space
+
         self.action_space = gym.spaces.Box(low=self.action_space.low.flatten(),
                                            high=self.action_space.high.flatten())
 
     def action(self, action):
-        return np.expand_dims(action, axis=0)
+        return np.reshape(action, self._original_action_space.shape)
 
     def reverse_action(self, action):
         raise NotImplementedError

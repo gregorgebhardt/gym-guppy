@@ -1,44 +1,71 @@
 import numpy as np
 
-from numba import njit
+from numba import njit, jit
 
-from gym_guppy.tools.reward_function import reward_function, reward_function_with_args, reward_wrapper
+from gym_guppy import GuppyEnv
+from gym_guppy.tools.reward_function import reward_function, reward_function_with_args
 from gym_guppy.tools.math import row_norm
 
 
-@reward_function_with_args
-@njit
-def negative_distance_to_swarm(_state, _action, next_state, robot_id):
+__all__ = ['negative_distance_to_swarm',
+           'follow_reward',
+           'approach_swarm_reward',
+           'proximity_to_center_reward',
+           'wall_avoidance_gate',
+           'in_zor_gate',
+           'in_zoi_gate']
+
+
+@reward_function
+# @jit
+def negative_distance_to_swarm(env: GuppyEnv, _state, _action, next_state):
     """
     TODO: documentation
+    :param env
     :param _state:
     :param _action:
     :param next_state:
-    :param robot_id:
     :return:
     """
+    robot_id = env.robots_idx[0]
     robot_state = next_state[robot_id, :]
     swarm_state = np.array([s for i, s in enumerate(next_state) if i != robot_id])
     return [-1 * np.sum(row_norm(swarm_state - robot_state))]
-    
 
-@reward_function_with_args
-# @njit
-def follow_reward(state, _action, next_state, robot_id):
+
+@njit
+def extract_swarm_state(state, robot_id):
+    if robot_id:
+        return np.concatenate((state[:robot_id, :], state[robot_id + 1:, :]))
+    else:
+        return state[robot_id + 1:, :]
+
+
+@njit
+def _robot_swarm_dist(state, robot_id):
+    swarm_state = extract_swarm_state(state, robot_id)
+    robot_state = state[robot_id, :]
+    return row_norm(swarm_state[:, :2] - robot_state[:2])
+
+
+@reward_function
+# @jit
+def follow_reward(env: GuppyEnv, state, _action, next_state):
     """
     TODO: documentation
+    :param env:
     :param state:
     :param _action:
     :param next_state:
-    :param robot_id:
     :return:
     """
-    env_agents_before = np.concatenate((state[:robot_id, :2], state[robot_id+1:, :2]))
-    env_agents_now = np.concatenate((next_state[:robot_id, :2], next_state[robot_id + 1:, :2]))
-    swim_directions = env_agents_now - env_agents_before
-    directions_to_actor = state[robot_id, :2] - env_agents_before
-    inner = swim_directions.dot(directions_to_actor.T)
-    norm_b = row_norm(directions_to_actor)
+    robot_id = env.robots_idx[0]
+    env_agents_before = extract_swarm_state(state, robot_id)[:, :2]
+    env_agents_now = extract_swarm_state(next_state, robot_id)[:, :2]
+    fish_swim_vec = env_agents_now - env_agents_before
+    rob_fish_vec = state[robot_id, :2] - env_agents_before
+    inner = fish_swim_vec.dot(rob_fish_vec.T)
+    norm_b = row_norm(rob_fish_vec)
     follow_metric = inner / norm_b
     # follow_metric[np.isnan(follow_metric)] = 0
     follow_metric = np.where(np.isnan(follow_metric), .0, follow_metric)
@@ -46,46 +73,63 @@ def follow_reward(state, _action, next_state, robot_id):
     return reward
 
 
-@reward_function_with_args
-@njit
-def fish_to_robot_reward(state, _action, next_state, robot_id):
+@reward_function
+# @jit
+def approach_swarm_reward(env: GuppyEnv, state, _action, next_state):
     """
     TODO: documentation
+    :param env:
     :param state:
     :param _action:
     :param next_state:
-    :param robot_id:
     :return:
     """
-    env_agents_before = np.array([s[:2] for i, s in enumerate(state) if i != robot_id])
-    env_agents_now = np.array([s[:2] for i, s in enumerate(next_state) if i != robot_id])
-    actor_before = state[robot_id, :2]
-    norm_before = row_norm(actor_before - env_agents_before)
-    norm_after = row_norm(actor_before - env_agents_now)
+    robot_id = env.robots_idx[0]
+    norm_before = _robot_swarm_dist(state, robot_id)
+    norm_after = _robot_swarm_dist(next_state, robot_id)
     difference = norm_before - norm_after
     return np.mean(difference)
 
 
-@reward_function_with_args
-def clipped_proximity_bonus(state, clip_value, robot_id):
-    env_agents_now = np.array([s[:2] for i, s in enumerate(state) if i != robot_id])
-    robot_coordinates = state[robot_id, :2]
-    distance_to_robot = np.linalg.norm(robot_coordinates - fish_coordinates)
-    clipped_distance = max(clip_value, distance_to_robot)
-    return 1.0 + clip_value - clipped_distance
+@reward_function
+# @jit
+def neg_robot_swarm_dist(env: GuppyEnv, _state, _action, next_state):
+    robot_id = env.robots_idx[0]
+    robot_swarm_dist = _robot_swarm_dist(next_state, robot_id)
+    return -np.mean(robot_swarm_dist)
 
 
 @reward_function_with_args
-@njit
-def proximity_to_center_reward(_state, _action, next_state, half_diagonal, robot_id):
+# @jit
+def proximity_to_center_reward(env: GuppyEnv, _state, _action, next_state, half_diagonal):
+    robot_id = env.robots_idx[0]
     env_agents_coordinates = np.array([s[:2] for i, s in enumerate(next_state) if i != robot_id])
     norm_to_center = row_norm(env_agents_coordinates)
     return (half_diagonal - np.mean(norm_to_center)) / half_diagonal
 
 
-def distance_to_fish(new_state):
-    # TODO: this function assumes, the robot position is always in the first row
-    #  reuse code from guppy_gym, e.g., tools.math.get_local_poses
-    fish_coordinates = new_state[1:, :2]
-    robot_coordinates = new_state[0, :2]
-    return np.linalg.norm(robot_coordinates - fish_coordinates)
+@reward_function_with_args
+# @jit
+def wall_avoidance_gate(env: GuppyEnv, _state, _action, next_state, epsilon):
+    min_wall_dist = np.min(np.abs(np.asarray(env.world_bounds) - next_state[env.robots_idx[0], :2]))
+    if min_wall_dist > epsilon:
+        return 1.
+    return .0
+
+
+@reward_function
+def in_zor_gate(env: GuppyEnv, _state, _action, next_state):
+    from gym_guppy.guppies._couzin_guppies import _ZOR
+    robot_id = env.robots_idx[0]
+    robot_swarm_dist = _robot_swarm_dist(next_state, robot_id)
+    if np.any(robot_swarm_dist <= _ZOR):
+        return 0.
+    return 1.
+
+
+@reward_function
+def in_zoi_gate(env: GuppyEnv, _state, _action, next_state):
+    zoi = np.array([g.zoi for g in env.guppies])
+    robot_id = env.robots_idx[0]
+    robot_swarm_dist = _robot_swarm_dist(next_state, robot_id)
+    return 1. + np.mean(zoi - np.maximum(robot_swarm_dist, zoi))

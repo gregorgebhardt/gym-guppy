@@ -49,21 +49,22 @@ class RayCastingWrapper(gym.ObservationWrapper):
 
 
 class RayCastingGoalWrapper(gym.ObservationWrapper):
-    def __init__(self, env, sector_bounds):
+    def __init__(self, env):
         super(RayCastingGoalWrapper, self).__init__(env)
         # redefine observation space
-        shape = list(env.observation_space['observation'].shape)
+        shape = list(env.observation_space.shape)
         shape[0] = shape[0] + 1
-        self.observation_space = gym.spaces.Box(low=0.0, high=1.0, shape=shape, dtype=env.observation_space['observation'].dtype)
+        self.observation_space = gym.spaces.Box(low=0.0, high=1.0, shape=shape, dtype=env.observation_space.dtype)
 
-        self.sector_bounds = sector_bounds
+        assert hasattr(self, 'sector_bounds')
+        # self.sector_bounds = sector_bounds
         self.diagonal = np.linalg.norm(self.env.world_bounds[0] - self.env.world_bounds[1])
 
     def observation(self, observation):
-        rc_goal = compute_dist_bins(self.get_robots_state()[0], observation['desired_goal'].reshape((1, 2)),
+        rc_goal = compute_dist_bins(self.get_robots_state()[0], self.env.desired_goal.reshape((1, 2)),
                                     self.sector_bounds, self.diagonal)
         goal = np.expand_dims(rc_goal, axis=0)
-        observation = np.concatenate((observation['observation'], goal), axis=0)
+        observation = np.concatenate((observation, goal), axis=0)
         return observation
 
 

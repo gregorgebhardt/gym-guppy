@@ -45,7 +45,7 @@ def ray_casting_walls(fish_pose, world_bounds, ray_orientations, diagonal_length
 
 
 # TODO: Check if Memory Leak still occurs after issue #4093 of Numba was solved
-@jit(nopython=True, parallel=False)
+# @jit(nopython=True, parallel=False)
 def _ray_casting_walls(fish_pose, world_bounds, ray_orientations):
     # assert len(fish_pose) in [3, 4], 'expecting 3- or 4-dimensional vector for fish_pose'
     fish_position = fish_pose[:2]
@@ -73,7 +73,8 @@ def _ray_casting_walls(fish_pose, world_bounds, ray_orientations):
 
     # intersections of all rays with the walls
     # TODO: allocating 1D array and reshaping afterwards is a workaround for issue #4093
-    intersections = np.empty((len(ray_orientations) * 4)).reshape((-1, 4)) * np.nan
+    intersections = np.empty((len(ray_orientations) * 4)).reshape((-1, 4))
+    intersections[:] = np.NaN
 
     indices = [np.asarray(ray_cos < .0).nonzero()[0],
                np.asarray(ray_sin < .0).nonzero()[0],
@@ -105,7 +106,8 @@ def compute_line_line_intersection(line1: np.ndarray, line2: np.ndarray):
 
     # if this coordinate is 0 then there is no intersection
     inz = c.nonzero()[0]
-    r = np.empty(shape=(len(c), 2)) * np.nan
+    r = np.empty(shape=(len(c), 2))
+    r[:] = np.NaN
 
     i1 = np.array([0])
     i2 = np.array([0])
@@ -141,26 +143,5 @@ def compute_dist_bins(relative_to, poses, bin_boundaries, max_dist):
     return 1 - dist_array
 
 
-# @njit
-# def ray_casting_goal(fish_pose, goal, ray_orientations, diagonal_length):
-#     c, s = np.cos(fish_pose[2]), np.sin(fish_pose[2])
-#     R = np.array(((c, -s), (s, c)))
-#     local_positions = (goal - fish_pose[:2]).dot(R)
-#     # compute polar coordinates
-#     local_positions = np.expand_dims(local_positions, axis=0)
-#     dist = np.sqrt(np.sum(local_positions ** 2, axis=1))
-#     phi = np.arctan2(local_positions[:, 1], local_positions[:, 0])
-#     # filter out if outside field of vision
-#     within_fop = np.abs(phi) <= ray_orientations[-1]
-#     phi = phi[within_fop]
-#     dist = dist[within_fop]
-#     # identify the right ray_orientation for each angle
-#     idx = np.searchsorted(ray_orientations, phi, side="left")
-#     idx = idx - (np.abs(phi - ray_orientations[idx - 1]) < np.abs(phi - ray_orientations[idx]))
-#     # Sort in descending order of distances, which ensures that we fill each ray_orientation with
-#     # the distance of the nearest agent belonging to the ray_orientation
-#     reverse_argsorted_dist = np.argsort(dist)[::-1]
-#     sorted_idx = idx[reverse_argsorted_dist]
-#     out = np.ones(len(ray_orientations) - 1)
-#     out[sorted_idx] = dist[reverse_argsorted_dist] / diagonal_length
-#     return 1 - out
+def sigmoid(x, shrink):
+    return 2. / (1 + np.exp(-x * shrink)) - 1.

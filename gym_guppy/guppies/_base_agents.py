@@ -6,6 +6,7 @@ from Box2D import b2Vec2
 from scipy.spatial import cKDTree
 
 from gym_guppy.bodies import FishBody
+from gym_guppy.tools.controller import TwoWheelsController2
 
 
 class Agent(FishBody, abc.ABC):
@@ -99,11 +100,14 @@ class TurnBoostAgent(Agent, abc.ABC):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self._max_turn = np.pi / 10.
-        self._max_boost = .05
+        self._max_turn_per_step = np.pi / 2.
+        self._max_boost_per_step = .012
+        self._max_turn = self._max_turn_per_step
+        self._max_boost = self._max_boost_per_step
 
         self.__turn = None
         self.__boost = None
+        self.__reset_velocity = False
 
     @property
     def turn(self):
@@ -111,7 +115,8 @@ class TurnBoostAgent(Agent, abc.ABC):
 
     @turn.setter
     def turn(self, turn):
-        self.__turn = np.minimum(np.maximum(turn, -self._max_turn*5), self._max_turn*5)
+        self.__reset_velocity = True
+        self.__turn = np.minimum(np.maximum(turn, -self._max_turn), self._max_turn)
 
     @property
     def boost(self):
@@ -119,20 +124,23 @@ class TurnBoostAgent(Agent, abc.ABC):
 
     @boost.setter
     def boost(self, boost):
-        self.__boost = np.minimum(np.maximum(boost, .0), self._max_boost*5)
+        self.__reset_velocity = True
+        self.__boost = np.minimum(np.maximum(boost, .0), self._max_boost)
 
     def step(self, time_step):
-        if self.turn:
-            t = np.minimum(np.maximum(self.turn, -self._max_turn), self._max_turn)
-            self._body.angle += t
+        if self.__reset_velocity:
             self._body.linearVelocity = b2Vec2(.0, .0)
+            self.__reset_velocity = False
+        if self.turn:
+            t = np.minimum(np.maximum(self.turn, -self._max_turn_per_step), self._max_turn_per_step)
+            self._body.angle += t
             self.turn -= t
         elif self.boost:
-            b = np.minimum(self.boost, self._max_boost)
+            b = np.minimum(self.__boost, self._max_boost_per_step)
             # self._body.ApplyForceToCenter(self._body.GetWorldVector(b2Vec2(b, .0)), wake=True)
             self._body.ApplyLinearImpulse(self._body.GetWorldVector(b2Vec2(b, .0)),
                                           point=self._body.worldCenter, wake=True)
-            self.boost -= b
+            self.__boost -= b
 
 
 class ConstantVelocityAgent(Agent, abc.ABC):
@@ -193,3 +201,27 @@ class TurnSpeedAgent(Agent, abc.ABC):
             # TODO is speed correct?
             self.set_linear_velocity([self.speed, .0], local=True)
             self.__speed = None
+
+
+class VelocityControlledAgent(Agent, abc.ABC):
+    def __init__(self, ctrl_params=None, **kwargs):
+        super().__init__(**kwargs)
+
+        if ctrl_params is None:
+            ctrl_params = {}
+
+        self._two_wheels_controller = TwoWheelsController2(**ctrl_params)
+        self._target = None
+        self._counter = 0
+
+    def step(self, time_step):
+        if self._counter % 4 == 0:
+            motor_speeds = self._two_wheels_controller.speeds(self.get_pose(), self._target)
+            pwm_commands = motor_speeds.vel_to_pwm()
+            x_vel, r_vel = pwm_commands.pwm_to_vel().get_local_velocities()
+
+            self.set_angular_velocity(r_vel)
+            self.set_linear_velocity([x_vel, .0], local=True)
+        self._counter += 1
+
+

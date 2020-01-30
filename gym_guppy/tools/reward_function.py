@@ -1,13 +1,16 @@
 import abc
+import warnings
 from functools import update_wrapper
 
 import numpy as np
 from typing import Callable, Any, Tuple, Union
 
-_RewardFunctionT = Callable[[np.ndarray, np.ndarray, np.ndarray], float]
-_RewardFunctionWithArgsT = Callable[[np.ndarray, np.ndarray, np.ndarray, Any], float]
-_RewardWrapperT = Callable[[float, Any], float]
-_InputWrapperT = Callable[[np.ndarray, np.ndarray, np.ndarray, Any], Tuple[np.ndarray, np.ndarray, np.ndarray]]
+from gym import Env
+
+_RewardFunctionT = Callable[[Env, np.ndarray, np.ndarray, np.ndarray], float]
+_RewardFunctionWithArgsT = Callable[[Env, np.ndarray, np.ndarray, np.ndarray, Any], float]
+_RewardWrapperT = Callable[[Env, float, Any], float]
+_InputWrapperT = Callable[[Env, np.ndarray, np.ndarray, np.ndarray, Any], Tuple[np.ndarray, np.ndarray, np.ndarray]]
 
 reward_registry = {}
 
@@ -101,7 +104,7 @@ class RewardFunctionBase(abc.ABC):
         return RewardWrapper(abs, self)
 
     @abc.abstractmethod
-    def __call__(self, state, action, next_state):
+    def __call__(self, env, state, action, next_state):
         raise NotImplementedError
 
     def __str__(self):
@@ -119,8 +122,16 @@ class RewardFunction(RewardFunctionBase):
         self._function_kwargs = function_kwargs if function_kwargs else {}
         update_wrapper(self, f)
 
-    def __call__(self, state, action, next_state):
-        return self._reward_function(state, action, next_state, *self._function_args, **self._function_kwargs)
+    def __call__(self, env, state, action, next_state):
+        ret = self._reward_function(env, state, action, next_state, *self._function_args, **self._function_kwargs)
+        if not (np.isscalar(ret) and np.isfinite(ret)):
+            warnings.warn('non-scalar or non-finite value in reward function:\n'
+                          f'   {self.__repr__()}\n'
+                          'with arguments:\n'
+                          f'   state: {state}'
+                          f'   action: {action}'
+                          f'   next_state: {next_state}')
+        return ret
 
     def __repr__(self):
         if self._function_args or self._function_kwargs:
@@ -133,11 +144,10 @@ class RewardFunction(RewardFunctionBase):
 
 
 class WrapperBase(RewardFunctionBase, abc.ABC):
-    def __init__(self, f: Union[_RewardWrapperT, _InputWrapperT], a: RewardFunctionBase, *wrapper_args,
-                 **wrapper_kwargs):
+    def __init__(self, f: Union[_RewardWrapperT, _InputWrapperT], a: RewardFunctionBase, wrapper_args, wrapper_kwargs):
         self._a = a
         self._f = f
-        self._wrapper_args = wrapper_args
+        self._wrapper_args = wrapper_args if wrapper_args else ()
         self._wrapper_kwargs = wrapper_kwargs if wrapper_kwargs else {}
         update_wrapper(self, f)
 
@@ -152,26 +162,42 @@ class WrapperBase(RewardFunctionBase, abc.ABC):
 
 
 class RewardWrapper(WrapperBase):
-    def __init__(self, f: _RewardWrapperT, a: RewardFunctionBase, *wrapper_args, **wrapper_kwargs):
+    def __init__(self, f: _RewardWrapperT, a: RewardFunctionBase, wrapper_args, wrapper_kwargs):
         super().__init__(f, a, wrapper_args, wrapper_kwargs)
 
-    def __call__(self, state, action, next_state):
-        return self._f(self._a(state, action, next_state), *self._wrapper_args, **self._wrapper_kwargs)
+    def __call__(self, env, state, action, next_state):
+        ret = self._f(self._a(env, state, action, next_state), *self._wrapper_args, **self._wrapper_kwargs)
+        if not (np.isscalar(ret) and np.isfinite(ret)):
+            warnings.warn('non-scalar or non-finite value in reward function:\n'
+                          f'   {self.__repr__()}\n'
+                          'with arguments:\n'
+                          f'   state: {state}'
+                          f'   action: {action}'
+                          f'   next_state: {next_state}')
+        return ret
 
 
 class InputWrapper(WrapperBase):
-    def __init__(self, f: _InputWrapperT, a: RewardFunctionBase, *wrapper_args, **wrapper_kwargs):
+    def __init__(self, f: _InputWrapperT, a: RewardFunctionBase, wrapper_args, wrapper_kwargs):
         super().__init__(f, a, wrapper_args, wrapper_kwargs)
 
-    def __call__(self, state, action, next_state):
-        return self._a(*self._f(state, action, next_state, *self._wrapper_args, **self._wrapper_kwargs))
+    def __call__(self, env, state, action, next_state):
+        ret = self._a(*self._f(env, state, action, next_state, *self._wrapper_args, **self._wrapper_kwargs))
+        if not (np.isscalar(ret) and np.isfinite(ret)):
+            warnings.warn('non-scalar or non-finite value in reward function:\n'
+                          f'   {self.__repr__()}\n'
+                          'with arguments:\n'
+                          f'   state: {state}'
+                          f'   action: {action}'
+                          f'   next_state: {next_state}')
+        return ret
 
 
 class RewardConst(RewardFunctionBase):
     def __init__(self, a):
         self._a = a
 
-    def __call__(self, state, action, next_state):
+    def __call__(self, env, state, action, next_state):
         return self._a
 
     def __repr__(self):
@@ -182,8 +208,8 @@ class RewardBinaryOp(RewardFunctionBase, abc.ABC):
     op = None
 
     def __init__(self, a: RewardFunctionBase, b: RewardFunctionBase):
-        self._a = a
-        self._b = b
+        self._a: RewardFunctionBase = a
+        self._b: RewardFunctionBase = b
 
     def _parentheses(self, other: RewardFunctionBase):
         if other.precedence > self.precedence:
@@ -198,37 +224,37 @@ class RewardSum(RewardBinaryOp):
     precedence = 7
     op = "+"
 
-    def __call__(self, state, action, next_state):
-        return self._a(state, action, next_state) + self._b(state, action, next_state)
+    def __call__(self, env, state, action, next_state):
+        return self._a(env, state, action, next_state) + self._b(env, state, action, next_state)
 
 
 class RewardSub(RewardBinaryOp):
     precedence = 7
     op = "-"
 
-    def __call__(self, state, action, next_state):
-        return self._a(state, action, next_state) - self._b(state, action, next_state)
+    def __call__(self, env, state, action, next_state):
+        return self._a(env, state, action, next_state) - self._b(env, state, action, next_state)
 
 
 class RewardMul(RewardBinaryOp):
     precedence = 6
     op = "*"
 
-    def __call__(self, state, action, next_state):
-        return self._a(state, action, next_state) * self._b(state, action, next_state)
+    def __call__(self, env, state, action, next_state):
+        return self._a(env, state, action, next_state) * self._b(env, state, action, next_state)
 
 
 class RewardDiv(RewardBinaryOp):
     precedence = 6
     op = "/"
 
-    def __call__(self, state, action, next_state):
-        return self._a(state, action, next_state) / self._b(state, action, next_state)
+    def __call__(self, env, state, action, next_state):
+        return self._a(env, state, action, next_state) / self._b(env, state, action, next_state)
 
 
 class RewardPow(RewardBinaryOp):
     precedence = 4
     op = "**"
 
-    def __call__(self, state, action, next_state):
-        return self._a(state, action, next_state) ** self._b(state, action, next_state)
+    def __call__(self, env, state, action, next_state):
+        return self._a(env, state, action, next_state) ** self._b(env, state, action, next_state)

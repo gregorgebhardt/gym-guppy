@@ -1,9 +1,9 @@
 import abc
+import types
 import warnings
 from typing import Union
 
 import gym
-from gym import spaces
 import numpy as np
 from Box2D import b2PolygonShape, b2Vec2, b2World
 from scipy.spatial import cKDTree
@@ -12,12 +12,9 @@ from gym_guppy.bodies import Body, _world_scale
 from gym_guppy.guppies import Agent, Guppy
 from gym_guppy.tools.reward_function import RewardConst, RewardFunctionBase, reward_registry
 
-from functools import partial
-
-
 
 class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
-    metadata = {'render.modes': ['human']}
+    metadata = {'render.modes': ['human', 'video', 'rgb_array']}
 
     world_size = world_width, world_height = 1., 1.
     # world_size = world_width, world_height = .5, .5
@@ -29,24 +26,11 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
     __sim_steps_per_second = 100
     __sim_velocity_iterations = 8
     __sim_position_iterations = 3
-    __steps_per_action = 10
+    __steps_per_action = 50
+    _guppy_steps_per_action = 10
 
     def __init_subclass__(cls, **kwargs):
-        old_init = cls.__init__
-
-        def wrapped__init__(self: cls, *_args, **_kwargs):
-            old_init(self, *_args, **_kwargs)
-
-            # TODO: do we need to call this here?
-            self._reset()
-
-            self.action_space = self._get_action_space()
-            self.observation_space = self._get_observation_space()
-            self.state_space = self._get_state_space()
-
-            self._step_world()
-
-        cls.__init__ = wrapped__init__
+        pass
 
     def __new__(cls, *args, **kwargs):
         cls.sim_steps_per_second = cls.__sim_steps_per_second
@@ -56,7 +40,24 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
         cls.world_bounds = (np.array([-cls.world_width / 2, -cls.world_height / 2]),
                             np.array([cls.world_width / 2, cls.world_height / 2]))
 
-        return super(GuppyEnv, cls).__new__(cls)
+        cls.__fps = cls.__sim_steps_per_second / cls.__steps_per_action
+        cls.metadata['video.frames_per_second'] =  cls.__fps
+
+        class WrappedCls(cls):
+            def __init__(self, *_args, **_kwargs):
+                super(WrappedCls, self).__init__(*_args, **_kwargs)
+
+                # TODO: do we need to call this here?
+                # TODO: BUG!!!
+                self._reset()
+
+                self.action_space = self._get_action_space()
+                self.observation_space = self._get_observation_space()
+                self.state_space = self._get_state_space()
+
+                self._step_world()
+
+        return super(GuppyEnv, cls).__new__(WrappedCls)
 
     def __init__(self, *args, **kwargs):
         super(GuppyEnv, self).__init__(*args, **kwargs)
@@ -97,7 +98,7 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
         self.render_mode = 'human'
         self.video_path = None
 
-        self._reward_function: RewardFunctionBase = RewardConst(0.0)
+        self.set_reward(RewardConst(0.0))
 
         self.action_space = None
         self.observation_space = None
@@ -119,6 +120,13 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
     @property
     def robots(self):
         return (self.__agents[r_idx] for r_idx in self.__robots_idx)
+
+    @property
+    def robot(self):
+        if len(self.__robots_idx):
+            return self.__agents[self.__robots_idx[0]]
+        else:
+            return None
 
     @property
     def robots_idx(self):
@@ -212,11 +220,16 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
     def get_observation(self, state):
         return state
 
+    def _reward_function(self, state, action, next_state):
+        return .0
+
     def set_reward(self, reward_function: Union[RewardFunctionBase, str]):
         if isinstance(reward_function, RewardFunctionBase):
-            self._reward_function = reward_function
+            # self._reward_function = reward_function
+            self._reward_function = types.MethodType(reward_function, self)
         else:
-            self._reward_function = eval(reward_function, reward_registry)
+            # self._reward_function = eval(reward_function, reward_registry)
+            self._reward_function = types.MethodType(eval(reward_function, reward_registry), self)
 
     def get_reward(self, state, action, new_state):
         return self._reward_function(state, action, new_state)
@@ -256,24 +269,25 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
 
         # step to resolve
         self._step_world()
-        
+
         return self.get_observation(self.get_state())
 
     def step(self, action: np.ndarray):
-        # if self.action_space and action is not None:
-        #     assert self.action_space.contains(action), "%r (%s) invalid " % (action, type(action))
-
         # state before action is applied
         state = self.get_state()
 
+        # action[:] = np.NaN
         action = np.atleast_2d(action)
         # apply action to robots
         for r, a in zip(self.robots, action):
-            r.set_action(a)
+            if r.action_space.contains(a):
+                r.set_action(a)
+            else:
+                r.set_action(np.zeros(r.action_space.shape))
 
-        self._compute_guppy_actions(state)
-            
-        for i in range(self.__steps_per_action):
+        while self._internal_sim_loop_condition():
+            self._compute_guppy_actions(state)
+
             for a in self.__agents:
                 a.step(self.sim_step)
 
@@ -285,7 +299,7 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
 
             if self._screen is not None and self.__sim_steps % 4 == 0:
                 # self.render(self.render_mode, framerate=self.__sim_steps_per_second)
-                self.render(self.render_mode)
+                self.render()
 
         # state
         next_state = self.get_state()
@@ -293,7 +307,7 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
 
         # update KD-tree
         self._update_kdtree(next_state)
-        
+
         # observation
         observation = self.get_observation(next_state)
 
@@ -308,12 +322,16 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
 
         return observation, reward, done, info
 
+    def _internal_sim_loop_condition(self):
+        return self.__sim_steps > 0 and self.__sim_steps % self.__steps_per_action == 0
+
     def _update_kdtree(self, state):
         self.kd_tree = cKDTree(state[:, :2])
 
     def _compute_guppy_actions(self, state):
-        for i, g in enumerate(self.guppies):
-            g.compute_next_action(state=state, kd_tree=self.kd_tree)
+        if self.sim_step % self._guppy_steps_per_action == 0:
+            for i, g in enumerate(self.guppies):
+                g.compute_next_action(state=state, kd_tree=self.kd_tree)
 
     def _step_world(self):
         self.world.Step(self.sim_step, self.__sim_velocity_iterations, self.__sim_position_iterations)
@@ -322,15 +340,42 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
         state = self.get_state()
         self._update_kdtree(state)
 
-    def render(self, mode=None, fps=25):
-        # if close:
-        #     if self._screen is not None:
-        #         self._screen.close()
-        #         self._screen = None
-        #     return
+    def render(self, mode=None):
         if mode is None:
             mode = self.render_mode
+        else:
+            self.render_mode = mode
+        if mode is 'human':
+            return self._render_human()
+        elif mode is 'video':
+            return self._render_human(display=False)
+        elif mode is 'rgb_array':
+            return self._render_rgb_array()
 
+    def _render_rgb_array(self):
+        rgb_array = np.ones(self.screen_size + (3,), dtype=np.uint8) * 255
+
+        scale = np.divide(self.screen_size, self.world_size) * (.0, -1.)
+        offset = self.world_bounds[0]
+
+        for r in self.robots:
+            r_state = r.get_state()
+            col, row = np.int32(np.round((r_state[:2] - offset) * scale))
+            for r in range(max(row-3, 0), min(row+3, self.screen_height)):
+                for c in range(max(col-3, 0), min(col+3, self.screen_width)):
+                    rgb_array[r, c, 1:3] = 0
+
+        for g in self.guppies:
+            g_state = g.get_state()
+            col, row = np.int32(np.round((g_state[:2] - offset) * scale))
+            for r in range(max(row - 3, 0), min(row + 3, self.screen_height)):
+                for c in range(max(col - 3, 0), min(col + 3, self.screen_width)):
+                    rgb_array[r, c, 0:2] = 0
+
+        return rgb_array
+
+    def _render_human(self, display=True):
+        fps = self.__fps
         from gym_guppy.tools import rendering
         if self._screen is None:
             caption = self.spec.id if self.spec else ""
@@ -342,7 +387,7 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
                 _video_path = None
 
             self._screen = rendering.GuppiesViewer(self.screen_width, self.screen_height, caption=caption,
-                                                   fps=fps, display=mode == 'human', record_to=_video_path)
+                                                   fps=fps, display=display, record_to=_video_path)
             world_min, world_max = self.world_bounds
             self._screen.set_bounds(world_min[0], world_max[0], world_min[1], world_max[1])
         elif self._screen.close_requested():

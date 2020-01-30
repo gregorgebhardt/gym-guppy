@@ -1,3 +1,5 @@
+import abc
+
 import numpy as np
 from typing import List
 
@@ -12,6 +14,7 @@ _ZOR = 0.005  # zone of repulsion
 _ZOO = 0.09  # zone of orientation
 _ZOA = 1.0  # zone of attraction
 _FOP = np.deg2rad(270)  # field of perception
+_ZOI = _ZOR + _ZOO + _ZOA
 
 _WALL_NORMALS = np.array([[1, 0],
                           [0, 1],
@@ -153,7 +156,25 @@ def _compute_couzin_boost_action(state, world_bounds, max_boost, zor=_ZOR, zoo=_
     return theta_i, boost_i
 
 
-class ClassicCouzinGuppy(Guppy, ConstantVelocityAgent):
+class BaseCouzinGuppy(Guppy, abc.ABC):
+    @property
+    def zor(self):
+        return _ZOR
+
+    @property
+    def zoo(self):
+        return _ZOO
+
+    @property
+    def zoa(self):
+        return _ZOA
+
+    @property
+    def zoi(self):
+        return _ZOI
+
+
+class ClassicCouzinGuppy(BaseCouzinGuppy, ConstantVelocityAgent):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -165,13 +186,13 @@ class ClassicCouzinGuppy(Guppy, ConstantVelocityAgent):
         self._turn = _compute_couzin_action(state[i, :], self._world_bounds) + np.random.randn() * self._turn_noise
 
 
-class BoostCouzinGuppy(Guppy, TurnBoostAgent):
+class BoostCouzinGuppy(BaseCouzinGuppy, TurnBoostAgent):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
         self._turn_noise = .1
-        self._boost_noise = .005
         self._k_neighbors = 20
+        self._boost_noise = .005
 
     def compute_next_action(self, state: np.ndarray, kd_tree: cKDTree = None):
         k = min(self._k_neighbors, len(state))
@@ -179,7 +200,7 @@ class BoostCouzinGuppy(Guppy, TurnBoostAgent):
         if k == 1:
             i = [i]
 
-        out = _compute_couzin_boost_action(state[i, :], self._world_bounds, self._max_boost)
+        out = _compute_couzin_boost_action(state[i, :], self._world_bounds, self._max_boost_per_step)
         d_theta, d_boost = out
         # d_theta, d_boost = _compute_couzin_boost_action(state, self.id, self._max_boost)
         self.turn = d_theta + np.random.randn() * self._turn_noise
@@ -212,6 +233,8 @@ class AdaptiveCouzinGuppy(BoostCouzinGuppy):
         self._adaptive_zone_factors = np.array([self._initial_zone_factor] * len(self._unknown_agents))
         self._zone_radius = self._zone_radius_mean + np.random.rand() * self._zone_radius_noise
 
+        self._zone_cache = self.adaptive_couzin_zones()
+
     def adaptive_couzin_zones(self):
         zor = self._zone_radius * self._adaptive_zone_factors
         zoo = (self._zone_radius - zor) * self._adaptive_zone_factors
@@ -229,7 +252,7 @@ class AdaptiveCouzinGuppy(BoostCouzinGuppy):
         known_agents_ids = [i for i in sorted_state_i if i not in self._unknown_agents_ids]
         known_agents_state = state[known_agents_ids]
         d_theta_known, d_boost_known = _compute_couzin_boost_action(known_agents_state, self._world_bounds,
-                                                                    self._max_boost)
+                                                                    self._max_boost_per_step)
         d_theta_known += np.random.randn() * self._turn_noise
 
         unknown_agents_ids = [i for i in sorted_state_i if i in self._unknown_agents_ids]
@@ -254,7 +277,7 @@ class AdaptiveCouzinGuppy(BoostCouzinGuppy):
         d_theta_unknown, d_boost_unknown = .0, .0
         for i, (ua_id, zor, zoo, zoa) in enumerate(zip(self._unknown_agents_ids, *adaptive_zones)):
             d_theta_i, d_boost_i = _compute_couzin_boost_action(state[[self.id, ua_id]], self._world_bounds,
-                                                                self._max_boost, zor, zoo, zoa)
+                                                                self._max_boost_per_step, zor, zoo, zoa)
             d_theta_unknown += d_theta_i
             d_boost_unknown += d_boost_i
 
@@ -269,6 +292,22 @@ class AdaptiveCouzinGuppy(BoostCouzinGuppy):
         else:
             self.turn = d_theta_unknown
         self.boost = max(d_boost_known, d_boost_unknown)
+
+    @property
+    def zor(self):
+        return self._zone_cache[0]
+
+    @property
+    def zoo(self):
+        return self._zone_cache[1]
+
+    @property
+    def zoa(self):
+        return self._zone_cache[2]
+
+    @property
+    def zoi(self):
+        return sum(self._zone_cache)
 
 
 class BiasedAdaptiveCouzinGuppy(AdaptiveCouzinGuppy):
@@ -291,7 +330,7 @@ class BiasedAdaptiveCouzinGuppy(AdaptiveCouzinGuppy):
                 ap_th = np.arctan2(local_ap[1], local_ap[0])
 
                 if _ZOA * .5 >= ap_r >= _ZOR:
-                    turn_bias += np.sign(ap_th) * self.bias_gain * self._max_turn * (1 - ap_r)
+                    turn_bias += np.sign(ap_th) * self.bias_gain * self._max_turn_per_step * (1 - ap_r)
 
         if self.repulsion_points is not None:
             for rp in self.repulsion_points:
@@ -300,7 +339,7 @@ class BiasedAdaptiveCouzinGuppy(AdaptiveCouzinGuppy):
                 rp_th = np.arctan2(local_rp[1], local_rp[0])
 
                 if rp_r <= _ZOA:
-                    turn_bias += -1 * np.sign(rp_th) * self.bias_gain * self._max_turn * (1 - rp_r)
+                    turn_bias += -1 * np.sign(rp_th) * self.bias_gain * self._max_turn_per_step * (1 - rp_r)
 
         self.turn += turn_bias
 

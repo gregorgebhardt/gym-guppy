@@ -4,6 +4,7 @@ import gym
 import numpy as np
 
 from gym_guppy.guppies import Agent, TurnBoostAgent
+from gym_guppy.guppies._base_agents import VelocityControlledAgent
 
 
 class Robot(Agent, abc.ABC):
@@ -21,6 +22,10 @@ class Robot(Agent, abc.ABC):
     def set_action(self, action):
         pass
 
+    @abc.abstractmethod
+    def action_completed(self) -> bool:
+        pass
+
 
 class TurnBoostRobot(Robot, TurnBoostAgent):
     def set_action(self, action):
@@ -29,49 +34,56 @@ class TurnBoostRobot(Robot, TurnBoostAgent):
     
     @property
     def action_space(self):
-        return gym.spaces.Box(low=np.array([-self._max_turn, 0.0]), 
+        return gym.spaces.Box(low=np.array([-self._max_turn, 0.0]),
                               high=np.array([self._max_turn, self._max_boost]))
 
+    def action_completed(self) -> bool:
+        return True
 
-class GoToRobot(Robot, TurnBoostAgent):
-    def __init__(self, **kwargs):
-        super().__init__(** kwargs)
 
-        self.__target = None
-
-        self._turn_eps = np.pi / 32
-        self._boost_gain = .1
-        self._max_target_distance = .2
+class GoToRobot(Robot, VelocityControlledAgent):
+    _linear_damping = .0  # * _world_scale
+    _angular_damping = .0  # * _world_scale
 
     @property
-    def _target(self):
-        return self.__target
+    def action_space(self) -> gym.spaces.Box:
+        return gym.spaces.Box(low=np.array([-.05, -.05]),
+                              high=np.array([.05, .05]))
 
-    @_target.setter
-    def _target(self, new_target):
-        self.__target = new_target
+    def set_action(self, action):
+        self._target = self.get_world_point(action)
 
-        # get local polar coordinates
-        local_target = self.get_local_point(self.__target)
-        target_distance = np.linalg.norm(local_target)
-        if target_distance > self._max_target_distance:
-            local_target *= self._max_target_distance / target_distance
+    # def step(self, time_step):
+    #     super(GoToRobot, self).step(time_step)
 
-        if target_distance >= .005:
-            d = np.linalg.norm(local_target)
-            phi = np.arctan2(local_target[1], local_target[0])
 
-            # compute turn and boost
-            self.turn = phi
-            if abs(self.turn) < self._turn_eps:
-                self.turn = .0
-            self.boost = d * self._boost_gain
-        else:
-            self.turn = .0
-            self.boost = .0
+class ToTargetRobot(Robot, VelocityControlledAgent):
+    _angular_damping = .0
+    _linear_damping = .0
+
+    def __init__(self, **kwargs):
+        super(ToTargetRobot, self).__init__(**kwargs)
+
+        # set position epsilon to 1cm
+        self._pos_eps = .01
+        # set rotation epsilon to ??rad
+        self._ori_eps = np.deg2rad(5)
+
+        world_width = self._world_bounds[1, 0] - self._world_bounds[0, 0]
+        world_height = self._world_bounds[1, 1] - self._world_bounds[0, 1]
+        world_diag = np.sqrt(world_width**2 + world_height**2)
+        # TODO: test action space
+        self._action_space = gym.spaces.Box(low=np.array((-world_diag, -world_diag)),
+                                            high=np.array((world_diag, world_diag)))
+
+    @property
+    def action_space(self) -> gym.spaces.Box:
+        return self._action_space
 
     def set_action(self, action):
         self._target = action
 
-    # def step(self, time_step):
-    #     super(GoToRobot, self).step(time_step)
+    def action_completed(self) -> bool:
+        pos_error = self._target - self.get_position()
+        if np.linalg.norm(pos_error) < self._pos_eps:
+            return True
