@@ -165,7 +165,7 @@ class ForwardController(BaseController):
         # see robocontrol::ActionProcessing::TwoWheelsControl.cpp:14
         self._inv_sigmoid = True
 
-        self._last_pos_error = .0
+        self._last_pos_error = None
         self._i_error_dist = .0
 
     def speeds(self, ori_error, pos_error) -> MotorSpeeds:
@@ -197,7 +197,9 @@ class ForwardController(BaseController):
         return self._i * self._i_error
 
     def ctrl_d_dist(self, error):
-        d = self._d * (sigmoid(error * self._p_dist_error_factor, self._slope) - sigmoid(self._last_pos_error, self._slope))
+        if self._last_pos_error is None:
+            return .0
+        d = self._d * (sigmoid(error * self._p_dist_error_factor, self._slope) - sigmoid(self._last_pos_error * self._p_dist_error_factor, self._slope))
         self._last_pos_error = error
 
         return d

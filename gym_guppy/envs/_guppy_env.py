@@ -14,7 +14,7 @@ from gym_guppy.tools.reward_function import RewardConst, RewardFunctionBase, rew
 
 
 class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
-    metadata = {'render.modes': ['human', 'video', 'rgb_array']}
+    metadata = {'render.modes': ['human', 'video', 'rgb_array'], 'video.frames_per_second': None}
 
     world_size = world_width, world_height = 1., 1.
     # world_size = world_width, world_height = .5, .5
@@ -41,27 +41,14 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
                             np.array([cls.world_width / 2, cls.world_height / 2]))
 
         cls.__fps = cls.__sim_steps_per_second / cls.__steps_per_action
-        cls.metadata['video.frames_per_second'] =  cls.__fps
+        cls.metadata['video.frames_per_second'] = cls.__sim_steps_per_second / cls.__steps_per_action
 
-        class WrappedCls(cls):
-            def __init__(self, *_args, **_kwargs):
-                super(WrappedCls, self).__init__(*_args, **_kwargs)
-
-                # TODO: do we need to call this here?
-                # TODO: BUG!!!
-                self._reset()
-
-                self.action_space = self._get_action_space()
-                self.observation_space = self._get_observation_space()
-                self.state_space = self._get_state_space()
-
-                self._step_world()
-
-        return super(GuppyEnv, cls).__new__(WrappedCls)
+        return super(GuppyEnv, cls).__new__(cls)
 
     def __init__(self, *args, **kwargs):
         super(GuppyEnv, self).__init__(*args, **kwargs)
         self.__sim_steps = 0
+        self.__action_steps = 0
         self.__reset_counter = 0
 
         # create the world in Box2D
@@ -104,14 +91,13 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
         self.observation_space = None
         self.state_space = None
 
-        # remove, since we wrap now the __init__ function
-        # self._configure_environment()
-        #
-        # self.action_space = self._get_action_space()
-        # self.observation_space = self._get_observation_space()
-        # self.state_space = self._get_state_space()
-        #
-        # self._step_world()
+        self._reset()
+
+        self.action_space = self._get_action_space()
+        self.observation_space = self._get_observation_space()
+        self.state_space = self._get_state_space()
+
+        self._step_world()
 
     @property
     def _sim_steps(self):
@@ -280,10 +266,11 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
         action = np.atleast_2d(action)
         # apply action to robots
         for r, a in zip(self.robots, action):
-            if r.action_space.contains(a):
-                r.set_action(a)
-            else:
-                r.set_action(np.zeros(r.action_space.shape))
+            # assert r.action_space.contains(a)
+            r.set_env_state(state, self.kd_tree)
+            r.set_action(a)
+
+        self.__action_steps = 0
 
         while self._internal_sim_loop_condition():
             self._compute_guppy_actions(state)
@@ -296,6 +283,7 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
             # self.world.ClearForces()
 
             self.__sim_steps += 1
+            self.__action_steps += 1
 
             if self._screen is not None and self.__sim_steps % 4 == 0:
                 # self.render(self.render_mode, framerate=self.__sim_steps_per_second)
@@ -323,13 +311,13 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
         return observation, reward, done, info
 
     def _internal_sim_loop_condition(self):
-        return self.__sim_steps > 0 and self.__sim_steps % self.__steps_per_action == 0
+        return self.__action_steps < self.__steps_per_action
 
     def _update_kdtree(self, state):
         self.kd_tree = cKDTree(state[:, :2])
 
     def _compute_guppy_actions(self, state):
-        if self.sim_step % self._guppy_steps_per_action == 0:
+        if self.__sim_steps % self._guppy_steps_per_action == 0:
             for i, g in enumerate(self.guppies):
                 g.compute_next_action(state=state, kd_tree=self.kd_tree)
 

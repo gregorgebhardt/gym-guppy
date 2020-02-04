@@ -13,8 +13,14 @@ class Robot(Agent, abc.ABC):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self._env_state = None
+        self._env_kd_tree = None
 
         self._color = np.array((165, 98, 98))
+
+    def set_env_state(self, env_state, kd_tree):
+        self._env_state = env_state
+        self._env_kd_tree = kd_tree
 
     @property
     @abc.abstractmethod

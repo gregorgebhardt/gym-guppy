@@ -5,18 +5,17 @@ import gym
 import numpy as np
 from scipy.spatial.ckdtree import cKDTree
 
-from gym_guppy.guppies import Agent, GoToRobot, Guppy
+from gym_guppy.guppies import Agent, Guppy, ToTargetRobot
 from gym_guppy.tools import Feedback
 from gym_guppy.tools.math import is_point_left, normalize, rotation
 
 
-class AdaptiveAgent(GoToRobot, Guppy):
+class AdaptiveAgent(ToTargetRobot):
+    def action_completed(self) -> bool:
+        return True
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-
-        self._max_boost = .005
-        # self._boost_gain = .001
-        self._max_target_distance = .05
 
         self._feedback = Feedback()
         self._state: AdaptiveState = ApproachState()
@@ -26,17 +25,25 @@ class AdaptiveAgent(GoToRobot, Guppy):
         return gym.spaces.Box(high=np.inf, low=-np.inf, shape=tuple())
 
     def set_action(self, action):
-        warnings.warn("The adaptive agent does not accept any action and should be added as guppy to the env.")
-
-    def compute_next_action(self, state: np.ndarray, kd_tree: cKDTree = None):
-        robot_pose = state[self.id]
-        _, [nn] = kd_tree.query(robot_pose[:2], k=[2])
-        guppy_pose = state[nn]
+        robot_pose = self._env_state[self.id]
+        _, [nn] = self._env_kd_tree.query(robot_pose[:2], k=[2])
+        guppy_pose = self._env_state[nn]
 
         self._feedback.update(guppy_pose, robot_pose)
 
         self._state = self._state.switch_state()
-        self._target = self._state.compute_next_action(self, self._feedback, state, kd_tree)
+        self._target = self._state.compute_next_action(self, self._feedback, self._env_state, self._env_kd_tree)
+
+    def compute_next_action(self, state: np.ndarray, kd_tree: cKDTree = None):
+        # robot_pose = state[self.id]
+        # _, [nn] = kd_tree.query(robot_pose[:2], k=[2])
+        # guppy_pose = state[nn]
+        #
+        # self._feedback.update(guppy_pose, robot_pose)
+        #
+        # self._state = self._state.switch_state()
+        # self._target = self._state.compute_next_action(self, self._feedback, state, kd_tree)
+        pass
 
 
 class AdaptiveState(abc.ABC):
@@ -149,7 +156,7 @@ class LeadState(AdaptiveState):
 
         # check if guppy is close enough to robot
         if np.linalg.norm(guppy_pos - robot_pos) > self._max_lead_dist:
-            print('Waiting for Robot')
+            print('Waiting for Guppy')
             self._waiting_counter += 1
             return robot_pos
 

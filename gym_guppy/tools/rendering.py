@@ -97,7 +97,7 @@ class GuppiesViewer(object):
             pygame.display.flip()
             if self._writer:
                 self._writer.append_data(pygame.surfarray.pixels3d(self._window))
-            self._t.tick(self._fps)
+            # self._t.tick(self._fps)
         else:
             image = pygame.surfarray.array3d(self._window)
             if self._writer:
