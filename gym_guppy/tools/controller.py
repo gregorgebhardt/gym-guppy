@@ -37,8 +37,8 @@ class MotorSpeeds:
         rps = vel / cls._wheel_circumference
         pwm = np.clip(rps, -cls._max_rps, cls._max_rps) / cls._max_rps * cls._max_pwm
 
-        # return np.clip(pwm, -cls._pwm_clip, cls._pwm_clip)
-        return np.clip(pwm, -255, 255)
+        return np.clip(pwm, -cls._pwm_clip, cls._pwm_clip)
+        # return np.clip(pwm, -255, 255)
 
     @classmethod
     def _pwm_to_vel(cls, pwm):
@@ -71,14 +71,25 @@ class MotorSpeeds:
         return x_vel, r_vel
 
     def __add__(self, other):
+        assert self.is_vel == other.is_vel
         return MotorSpeeds(self.left + other.left, self.right + other.right)
+
+    def __mul__(self, other):
+        if isinstance(other, MotorSpeeds):
+            assert self.is_vel == other.is_vel
+            return MotorSpeeds(self.left * other.left, self.right * other.right)
+        else:
+            return MotorSpeeds(self.left * other, self.right * other)
+
+    def __rmul__(self, other):
+        return self.__mul__(other)
 
     def invert_gears(self):
         return MotorSpeeds(self.right, self.left)
 
 
 class BaseController(abc.ABC):
-    def __init__(self, p=1., i=1., d=.0, slope_dist=1., speed=1., p_error_factor=1., d_error_factor=1.):
+    def __init__(self, p=1., i=1., d=.0, slope=1., speed=1., p_error_factor=1., d_error_factor=1.):
         super().__init__()
 
         # TODO: set correct parameters
@@ -87,7 +98,7 @@ class BaseController(abc.ABC):
         self._d = d  # 1.
 
         self._inv_sigmoid = True
-        self._slope_dist = slope_dist
+        self._slope = slope
         self._speed = speed
 
         self._p_error_factor = p_error_factor
@@ -103,7 +114,7 @@ class BaseController(abc.ABC):
         pass
 
     def ctrl_p(self, error):
-        s = sigmoid(error * self._p_error_factor, self._slope_dist)
+        s = sigmoid(error * self._p_error_factor, self._slope)
         if self._inv_sigmoid:
             s = 1. - s
 
@@ -115,8 +126,8 @@ class BaseController(abc.ABC):
 
     def ctrl_d(self, error):
         # TODO: why is prev_error not scaled by d_error_factor?
-        s = sigmoid(error * self._d_error_factor, self._slope_dist)
-        err = sigmoid(self._prev_error, self._slope_dist)
+        s = sigmoid(error * self._d_error_factor, self._slope)
+        err = sigmoid(self._prev_error, self._slope)
         if self._inv_sigmoid:
             s = 1. - s
             err = 1. - err
@@ -179,20 +190,20 @@ class ForwardController(BaseController):
         return MotorSpeeds(ctrl_term * self._speed, ctrl_term * self._speed)
 
     def ctrl_p_dist(self, error):
-        return self._p * sigmoid(error * self._p_dist_error_factor, self._slope_dist)
+        return self._p * sigmoid(error * self._p_dist_error_factor, self._slope)
 
     def ctrl_i_dist(self, error):
         # self._i_error_dist = np.minimum(self._i_error_dist + error, self._i_error_dist_max)
         return self._i * self._i_error
 
     def ctrl_d_dist(self, error):
-        d = self._d * (sigmoid(error, self._slope_dist) - sigmoid(self._last_pos_error, self._slope_dist))
+        d = self._d * (sigmoid(error * self._p_dist_error_factor, self._slope) - sigmoid(self._last_pos_error, self._slope))
         self._last_pos_error = error
 
         return d
 
 
-class TwoWheelsController2:
+class TwoWheelsController:
     def __init__(self, ori_ctrl_params=None, fwd_ctrl_params=None):
         if ori_ctrl_params is None:
             ori_ctrl_params = {}
@@ -209,4 +220,13 @@ class TwoWheelsController2:
         fwd_commands = self._fwd_ctrl.speeds(ori_error, pos_error)
 
         return turn_commands + fwd_commands
+
+    def speed_parts(self, pose, target):
+        ori_error, pos_error = _compute_errors(pose, target)
+        # ori_error = np.rad2deg(ori_error)
+
+        turn_commands = self._ori_ctrl.speeds(ori_error, pos_error)
+        fwd_commands = self._fwd_ctrl.speeds(ori_error, pos_error)
+
+        return turn_commands, fwd_commands
 

@@ -77,8 +77,14 @@ class Body:
             linear_velocity = self._body.GetWorldVector(np.asarray(linear_velocity))
         self._body.linearVelocity = _world_scale * Box2D.b2Vec2(linear_velocity)
 
+    def get_linear_velocity(self):
+        return self._body.linearVelocity / _world_scale
+
     def set_angular_velocity(self, angular_velocity):
         self._body.angularVelocity = angular_velocity
+
+    def get_angular_velocity(self):
+        return self._body.angularVelocity
 
     def get_state(self):
         return self.get_pose()

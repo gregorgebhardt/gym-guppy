@@ -1,4 +1,5 @@
 import abc
+from collections import deque
 from typing import List
 
 import numpy as np
@@ -6,7 +7,7 @@ from Box2D import b2Vec2
 from scipy.spatial import cKDTree
 
 from gym_guppy.bodies import FishBody
-from gym_guppy.tools.controller import TwoWheelsController2
+from gym_guppy.tools.controller import TwoWheelsController
 
 
 class Agent(FishBody, abc.ABC):
@@ -210,18 +211,22 @@ class VelocityControlledAgent(Agent, abc.ABC):
         if ctrl_params is None:
             ctrl_params = {}
 
-        self._two_wheels_controller = TwoWheelsController2(**ctrl_params)
+        self._two_wheels_controller = TwoWheelsController(**ctrl_params)
         self._target = None
         self._counter = 0
 
+        n = 8
+        self._vel_buffer = deque([(.0, .0)] * n, maxlen=n)
+
     def step(self, time_step):
-        if self._counter % 4 == 0:
+        if self._counter % 5 == 0:
             motor_speeds = self._two_wheels_controller.speeds(self.get_pose(), self._target)
             pwm_commands = motor_speeds.vel_to_pwm()
-            x_vel, r_vel = pwm_commands.pwm_to_vel().get_local_velocities()
+            self._vel_buffer.append(pwm_commands.pwm_to_vel().get_local_velocities())
+            x_vel, r_vel = np.mean(np.asarray(self._vel_buffer)[:3, :], axis=0)
+            # x_vel, r_vel = self._vel_buffer.popleft()
 
             self.set_angular_velocity(r_vel)
             self.set_linear_velocity([x_vel, .0], local=True)
         self._counter += 1
-
 

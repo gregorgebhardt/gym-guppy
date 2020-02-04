@@ -8,6 +8,9 @@ from gym_guppy.guppies._base_agents import VelocityControlledAgent
 
 
 class Robot(Agent, abc.ABC):
+    _linear_damping = .0
+    _angular_damping = .0
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -58,16 +61,16 @@ class GoToRobot(Robot, VelocityControlledAgent):
 
 
 class ToTargetRobot(Robot, VelocityControlledAgent):
-    _angular_damping = .0
-    _linear_damping = .0
+    # _density = 10.0
+    # _friction = 0.1
+    # _angular_damping = .1
+    # _linear_damping = .1
 
     def __init__(self, **kwargs):
         super(ToTargetRobot, self).__init__(**kwargs)
 
         # set position epsilon to 1cm
-        self._pos_eps = .01
-        # set rotation epsilon to ??rad
-        self._ori_eps = np.deg2rad(5)
+        self._pos_eps = .02
 
         world_width = self._world_bounds[1, 0] - self._world_bounds[0, 0]
         world_height = self._world_bounds[1, 1] - self._world_bounds[0, 1]
