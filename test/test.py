@@ -44,23 +44,23 @@ class TestEnv(GuppyEnv):
                                                       position=p, orientation=o,
                                                       attraction_points=attraction_points,
                                                       repulsion_points=repulsion_points,
-                                                      bias_gain=.7))
+                                                      bias_gain=.7, unknown_agents=[adaptive_agent]))
             # self._add_guppy(MXNetGuppy(world=self.world, world_bounds=self.world_bounds,
             #                            position=p, orientation=o,
             #                            hdf_file=h5file))
 
-    # def _draw_on_table(self, screen):
-    #     for g in self.guppies:
-    #         if isinstance(g, AdaptiveCouzinGuppy):
-    #             zors, zoos, zoas = g.adaptive_couzin_zones()
-    #
-    #             width = .002
-    #             for zor, zoo, zoa in zip(zors, zoos, zoas):
-    #                 screen.draw_circle(g.get_position(), zor + zoo + zoa, color=(0, 100, 0), filled=False, width=width)
-    #                 if zoo + zor > width:
-    #                     screen.draw_circle(g.get_position(), zor + zoo, color=(50, 100, 100), filled=False, width=width)
-    #                 if zor > width:
-    #                     screen.draw_circle(g.get_position(), zor, color=(100, 0, 0), filled=False, width=width)
+    def _draw_on_table(self, screen):
+        for g in self.guppies:
+            if isinstance(g, AdaptiveCouzinGuppy):
+                zors, zoos, zoas = g.adaptive_couzin_zones()
+
+                width = .002
+                for zor, zoo, zoa in zip(zors, zoos, zoas):
+                    screen.draw_circle(g.get_position(), zor + zoo + zoa, color=(0, 100, 0), filled=False, width=width)
+                    if zoo + zor > width:
+                        screen.draw_circle(g.get_position(), zor + zoo, color=(50, 100, 100), filled=False, width=width)
+                    if zor > width:
+                        screen.draw_circle(g.get_position(), zor, color=(100, 0, 0), filled=False, width=width)
 
 
 if __name__ == '__main__':

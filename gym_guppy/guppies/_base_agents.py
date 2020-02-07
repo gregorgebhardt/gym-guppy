@@ -101,9 +101,9 @@ class TurnBoostAgent(Agent, abc.ABC):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self._max_turn_per_step = np.pi / 2.
+        self._max_turn_per_step = np.pi / 4.
         self._max_boost_per_step = .05
-        self._max_turn = self._max_turn_per_step
+        self._max_turn = 4 * self._max_turn_per_step
         self._max_boost = 5 * self._max_boost_per_step
 
         self.__turn = None
@@ -215,16 +215,29 @@ class VelocityControlledAgent(Agent, abc.ABC):
         self._target = None
         self._counter = 0
 
-        n = 8
-        self._vel_buffer = deque([(.0, .0)] * n, maxlen=n)
+        self._tau = 4
+        self._vel_buffer = deque([(.0, .0)] * self._tau, maxlen=self._tau)
+        self._ctrl_buffer = deque([(.0, .0)] * self._tau, maxlen=self._tau)
+        self._pose_tau = 1
+        self._pose_buffer = deque([(.0, .0, .0)] * self._pose_tau, maxlen=self._pose_tau)
+        self._target_buffer = deque([np.array((.0, .0))] * self._pose_tau, maxlen=self._pose_tau)
 
     def step(self, time_step):
         if self._counter % 5 == 0:
-            motor_speeds = self._two_wheels_controller.speeds(self.get_pose(), self._target)
+            self._pose_buffer.append(self.get_pose())
+            self._target_buffer.append(self._target)
+            motor_speeds = self._two_wheels_controller.speeds(self._pose_buffer[0], self._target_buffer[0])
             pwm_commands = motor_speeds.vel_to_pwm()
-            self._vel_buffer.append(pwm_commands.pwm_to_vel().get_local_velocities())
-            x_vel, r_vel = np.mean(np.asarray(self._vel_buffer)[:3, :], axis=0)
+            self._ctrl_buffer.append(pwm_commands.pwm_to_vel().get_local_velocities())
+
+            v_x_tau, v_r_tau = self._vel_buffer[0]
+            c_x_tau, c_r_tau = self._ctrl_buffer[0]
+            # x_vel, r_vel = np.mean(np.asarray(self._vel_buffer)[0, :], axis=0)
             # x_vel, r_vel = self._vel_buffer.popleft()
+            x_vel = .975 * self._vel_buffer[-1][0] + .2 * (c_x_tau - v_x_tau)
+            r_vel = .96 * self._vel_buffer[-1][1] + .2 * (c_r_tau - v_r_tau)
+
+            self._vel_buffer.append((x_vel, r_vel))
 
             self.set_angular_velocity(r_vel)
             self.set_linear_velocity([x_vel, .0], local=True)

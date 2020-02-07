@@ -1,6 +1,4 @@
-import abc
-from collections import namedtuple
-from copy import copy
+from typing import Union
 
 import numpy as np
 
@@ -27,8 +25,13 @@ class MotorSpeeds:
     _speed_clip = .35
     _pwm_clip = _speed_clip / _wheel_circumference / _max_rps * _max_pwm
 
-    def __init__(self, left=.0, right=.0, is_vel=True):
+    def __init__(self, left: Union[float, np.ndarray] = .0, right: Union[float, np.ndarray] = .0, is_vel=True):
         self.is_vel = is_vel
+        if isinstance(left, np.ndarray) or isinstance(right, np.ndarray):
+            assert isinstance(right, np.ndarray) and isinstance(left, np.ndarray), "either both, `left` and `right`, " \
+                                                                                   "have to be of type float or both " \
+                                                                                   "of type numpy.ndarray!"
+            assert left.shape == right.shape, 'both, `left` and `right` need to have the same shape!'
         self.left = left
         self.right = right
 
@@ -88,121 +91,75 @@ class MotorSpeeds:
         return MotorSpeeds(self.right, self.left)
 
 
-class BaseController(abc.ABC):
-    def __init__(self, p=1., i=1., d=.0, slope=1., speed=1., p_error_factor=1., d_error_factor=1.):
-        super().__init__()
-
-        # TODO: set correct parameters
+class SaturatedPIDController:
+    def __init__(self, p=1, i=1, d=1, slope=1.):
         self._p = p
-        self._i = i  # 1.
-        self._d = d  # 1.
-
-        self._inv_sigmoid = True
+        self._i = i
+        self._d = d
         self._slope = slope
-        self._speed = speed
-
-        self._p_error_factor = p_error_factor
-
-        self._d_error_factor = d_error_factor
-        self._prev_error = .0
 
         self._i_error = .0
-        self._i_error_max = 1.
+        self._i_error_max = 100.
+        self._d_prev_error = .0
 
-    @abc.abstractmethod
-    def speeds(self, ori_error, pos_error) -> MotorSpeeds:
-        pass
-
-    def ctrl_p(self, error):
-        s = sigmoid(error * self._p_error_factor, self._slope)
-        if self._inv_sigmoid:
-            s = 1. - s
-
-        return self._p * s
-
-    def ctrl_i(self, error):
-        # self._i_error = np.minimum(self._i_error + error, self._i_error_max)
-        return self._i * self._i_error
-
-    def ctrl_d(self, error):
-        # TODO: why is prev_error not scaled by d_error_factor?
-        s = sigmoid(error * self._d_error_factor, self._slope)
-        err = sigmoid(self._prev_error, self._slope)
-        if self._inv_sigmoid:
-            s = 1. - s
-            err = 1. - err
-
-        self._prev_error = error
-
-        return self._d * (s - err)
-
-
-class OrientationController(BaseController):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-        # c.f. robocontrol::ActionProcessing::TwoWheelsControl.cpp:13
-        self._inv_sigmoid = False
-
-    def speeds(self, ori_error, pos_error):
+    def __call__(self, error):
         ctrl_term = 0
         if self._p:
-            ctrl_term += self.ctrl_p(ori_error)
+            ctrl_term += self.p(error)
         if self._i:
-            ctrl_term += self.ctrl_i(ori_error)
+            ctrl_term += self.i(error)
         if self._d:
-            ctrl_term += self.ctrl_d(ori_error)
+            ctrl_term += self.d(error)
 
-        return MotorSpeeds(-ctrl_term * self._speed, ctrl_term * self._speed)
+        return ctrl_term
 
+    def p(self, error):
+        s = sigmoid(error, self._slope)
+        return self._p * s
 
-class ForwardController(BaseController):
-    def __init__(self, p_dist_error_factor=1., **kwargs):
-        super().__init__(**kwargs)
-
-        self._p_dist_error_factor = p_dist_error_factor
-
-        # see robocontrol::ActionProcessing::TwoWheelsControl.cpp:14
-        self._inv_sigmoid = True
-
-        self._last_pos_error = None
-        self._i_error_dist = .0
-
-    def speeds(self, ori_error, pos_error) -> MotorSpeeds:
-        ori_error = np.abs(ori_error)
-        ori_ctrl_term = 0
-        if self._p:
-            ori_ctrl_term += self.ctrl_p(ori_error)
-        if self._i:
-            ori_ctrl_term += self.ctrl_i(ori_error)
-        if self._d:
-            ori_ctrl_term += self.ctrl_d(ori_error)
-
-        dist_ctrl_term = 0
-        if self._p:
-            dist_ctrl_term += self.ctrl_p_dist(pos_error)
-        if self._i:
-            dist_ctrl_term += self.ctrl_i_dist(pos_error)
-        if self._d:
-            dist_ctrl_term += self.ctrl_d_dist(pos_error)
-        ctrl_term = ori_ctrl_term * dist_ctrl_term
-
-        return MotorSpeeds(ctrl_term * self._speed, ctrl_term * self._speed)
-
-    def ctrl_p_dist(self, error):
-        return self._p * sigmoid(error * self._p_dist_error_factor, self._slope)
-
-    def ctrl_i_dist(self, error):
-        # self._i_error_dist = np.minimum(self._i_error_dist + error, self._i_error_dist_max)
+    def i(self, error):
+        self._i_error = np.minimum(self._i_error + error, self._i_error_max)
         return self._i * self._i_error
 
-    def ctrl_d_dist(self, error):
-        if self._last_pos_error is None:
-            return .0
-        d = self._d * (sigmoid(error * self._p_dist_error_factor, self._slope) - sigmoid(self._last_pos_error * self._p_dist_error_factor, self._slope))
-        self._last_pos_error = error
+    def d(self, error):
+        s = sigmoid(error, self._slope)
+        err = s - self._d_prev_error
+        self._d_prev_error = s
+        return self._d * err
 
-        return d
+
+class ControllerBase:
+    def __init__(self, speed=1., **pid_args):
+        self._pid = SaturatedPIDController(**pid_args)
+        self._speed = speed
+
+    def __call__(self, ori_error, pos_error):
+        raise NotImplementedError
+
+
+class TurnController(ControllerBase):
+    def __call__(self, ori_error, pos_error) -> MotorSpeeds:
+        ctrl_term = self._pid(ori_error)
+        s = ctrl_term * self._speed
+
+        return MotorSpeeds(-s, s)
+
+
+class ForwardController(ControllerBase):
+    def __init__(self, ori_gate_slope=1., **kwargs):
+        super(ForwardController, self).__init__(**kwargs)
+
+        self._ori_gate_slope = ori_gate_slope
+
+    def _ori_gate(self, ori_error):
+        return 1 - sigmoid(np.abs(ori_error), self._ori_gate_slope)
+
+    def __call__(self, ori_error, pos_error) -> MotorSpeeds:
+        gate_value = self._ori_gate(ori_error)
+        ctrl_term = self._pid(pos_error)
+        s = gate_value * ctrl_term * self._speed
+
+        return MotorSpeeds(s, s)
 
 
 class TwoWheelsController:
@@ -211,24 +168,23 @@ class TwoWheelsController:
             ori_ctrl_params = {}
         if fwd_ctrl_params is None:
             fwd_ctrl_params = {}
-        self._ori_ctrl = OrientationController(**ori_ctrl_params)
+        self._ori_ctrl = TurnController(**ori_ctrl_params)
         self._fwd_ctrl = ForwardController(**fwd_ctrl_params)
 
     def speeds(self, pose, target):
         ori_error, pos_error = _compute_errors(pose, target)
-        # ori_error = np.rad2deg(ori_error)
 
-        turn_commands = self._ori_ctrl.speeds(ori_error, pos_error)
-        fwd_commands = self._fwd_ctrl.speeds(ori_error, pos_error)
+        turn_commands = self._ori_ctrl(ori_error, pos_error)
+        turn_commands.right = int(100*turn_commands.right)/100.
+        fwd_commands = self._fwd_ctrl(ori_error, pos_error)
 
         return turn_commands + fwd_commands
 
     def speed_parts(self, pose, target):
         ori_error, pos_error = _compute_errors(pose, target)
-        # ori_error = np.rad2deg(ori_error)
 
-        turn_commands = self._ori_ctrl.speeds(ori_error, pos_error)
-        fwd_commands = self._fwd_ctrl.speeds(ori_error, pos_error)
+        turn_commands = self._ori_ctrl(ori_error, pos_error)
+        turn_commands.right = int(100*turn_commands.right)/100.
+        fwd_commands = self._fwd_ctrl(ori_error, pos_error)
 
         return turn_commands, fwd_commands
-
