@@ -242,4 +242,3 @@ class VelocityControlledAgent(Agent, abc.ABC):
             self.set_angular_velocity(r_vel)
             self.set_linear_velocity([x_vel, .0], local=True)
         self._counter += 1
-

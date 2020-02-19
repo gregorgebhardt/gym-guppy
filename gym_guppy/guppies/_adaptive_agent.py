@@ -5,12 +5,12 @@ import gym
 import numpy as np
 from scipy.spatial.ckdtree import cKDTree
 
-from gym_guppy.guppies import Agent, Guppy, ToTargetRobot
+from gym_guppy.guppies import Agent, Guppy, GlobalTargetRobot
 from gym_guppy.tools import Feedback
 from gym_guppy.tools.math import is_point_left, normalize, rotation
 
 
-class AdaptiveAgent(ToTargetRobot):
+class AdaptiveAgent(GlobalTargetRobot):
     def action_completed(self) -> bool:
         return True
 

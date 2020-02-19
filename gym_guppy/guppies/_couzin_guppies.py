@@ -23,7 +23,7 @@ _WALL_NORMALS = np.array([[1, 0],
 _WALL_NORMALS_DIRECTION = np.deg2rad([0, 90, 180, -90])
 
 
-@njit
+@njit(fastmath=True)
 def _compute_local_state(state):
     # c, s = np.cos(state[0, 2]), np.sin(state[0, 2])
     # R = np.array(((c, -s), (s, c)))
@@ -41,7 +41,7 @@ def _compute_local_state(state):
     return local_positions, local_orientations, dist, phi
 
 
-@njit
+@njit(fastmath=True)
 def _compute_zone_indices(dist, phi, zor=_ZOR, zoo=_ZOO, zoa=_ZOA, field_of_perception=_FOP):
     i_fop = np.abs(phi) <= field_of_perception / 2.
 
@@ -52,7 +52,7 @@ def _compute_zone_indices(dist, phi, zor=_ZOR, zoo=_ZOO, zoa=_ZOA, field_of_perc
     return i_r, i_o, i_a, i_fop
 
 
-@njit
+@njit(fastmath=True)
 def _compute_couzin_direction(local_positions, local_orientations, i_r, i_o, i_a):
     if np.any(i_r):
         # compute desired direction to evade fish in zor
@@ -86,7 +86,7 @@ def _compute_couzin_direction(local_positions, local_orientations, i_r, i_o, i_a
     return d_theta
 
 
-@njit
+@njit(fastmath=True)
 def _compute_couzin_boost(local_positions, max_boost, i_r, i_o, i_a):
     if np.any(i_r):
         d_boost = 0.5 * max_boost * i_r.sum() / len(local_positions)
@@ -104,7 +104,7 @@ def _compute_couzin_boost(local_positions, max_boost, i_r, i_o, i_a):
     return d_boost
 
 
-@njit
+@njit(fastmath=True)
 def _wall_repulsion(self_pos, self_theta, world_bounds, zor=_ZOR):
     theta_w = .0
     dist_to_walls = np.abs(world_bounds - self_pos)
@@ -120,7 +120,7 @@ def _wall_repulsion(self_pos, self_theta, world_bounds, zor=_ZOR):
     return theta_w
 
 
-@njit
+@njit(fastmath=True)
 def _compute_couzin_action(state, world_bounds, zor=_ZOR, zoo=_ZOO, zoa=_ZOA, field_of_perception=_FOP):
     if len(state) == 1:
         return 0.0
@@ -137,7 +137,7 @@ def _compute_couzin_action(state, world_bounds, zor=_ZOR, zoo=_ZOO, zoa=_ZOA, fi
     return theta_i + theta_w
 
 
-@njit
+@njit(fastmath=True)
 def _compute_couzin_boost_action(state, world_bounds, max_boost, zor=_ZOR, zoo=_ZOO, zoa=_ZOA,
                                  field_of_perception=_FOP):
     local_positions, local_orientations, dist, phi = _compute_local_state(state)

@@ -43,8 +43,8 @@ class RayCastingWrapper(gym.ObservationWrapper):
         self.obs_placeholder = np.empty(self.observation_space.shape)
 
     def observation(self, state):
-        self.obs_placeholder[0] = compute_dist_bins(state[0], state[1:], self.sector_bounds, self.diagonal)
-        self.obs_placeholder[1] = ray_casting_walls(state[0], self.world_bounds, self.ray_directions, self.diagonal)
+        self.obs_placeholder[0] = compute_dist_bins(state[0], state[1:], self.sector_bounds, self.diagonal * 1.1)
+        self.obs_placeholder[1] = ray_casting_walls(state[0], self.world_bounds, self.ray_directions, self.diagonal * 1.1)
         return self.obs_placeholder
 
 

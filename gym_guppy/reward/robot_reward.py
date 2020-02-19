@@ -33,7 +33,7 @@ def negative_distance_to_swarm(env: GuppyEnv, _state, _action, next_state):
     return [-1 * np.sum(row_norm(swarm_state - robot_state))]
 
 
-@njit
+@njit(fastmath=True)
 def extract_swarm_state(state, robot_id):
     if robot_id:
         return np.concatenate((state[:robot_id, :], state[robot_id + 1:, :]))
@@ -41,7 +41,7 @@ def extract_swarm_state(state, robot_id):
         return state[robot_id + 1:, :]
 
 
-@njit
+@njit(fastmath=True)
 def _robot_swarm_dist(state, robot_id):
     swarm_state = extract_swarm_state(state, robot_id)
     robot_state = state[robot_id, :]

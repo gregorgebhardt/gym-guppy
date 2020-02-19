@@ -99,3 +99,19 @@ class RandomizeActionWrapper(gym.ActionWrapper):
 
     def reverse_action(self, action):
         raise NotImplementedError
+
+
+class Local2GlobalWrapper(gym.ActionWrapper):
+    def action(self, action):
+        global_actions = []
+        for r, a in zip(self.robots, action):
+            global_actions.append(r.get_global_point(action))
+
+        return np.asarray(global_actions)
+
+    def reverse_action(self, action):
+        local_actions = []
+        for r, a in zip(self.robots, action):
+            local_actions.append(r.get_local_point(action))
+
+        return np.asarray(local_actions)

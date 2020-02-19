@@ -91,22 +91,40 @@ class Body:
         # return tuple((*self._body.position, self._body.angle))
 
     def get_local_point(self, point):
-        return np.asarray(self._body.GetLocalPoint(_world_scale * np.asarray(point))) / _world_scale
+        return np.asarray(self._body.GetLocalPoint(_world_scale * np.asarray(point, dtype=np.float64))) / _world_scale
+
+    def get_world_point(self, point):
+        return np.asarray(self._body.GetWorldPoint(_world_scale * np.asarray(point, dtype=np.float64))) / _world_scale
+
+    def get_global_point(self, point):
+        return self.get_world_point(point)
 
     def get_local_vector(self, vector):
         return np.asarray(self._body.GetLocalVector(vector))
 
+    def get_world_vector(self, vector):
+        return np.asarray(self._body.GetWorldVector(vector))
+
+    def get_global_vector(self, vector):
+        return self.get_world_vector(vector)
+
     def get_local_orientation(self, angle):
         return angle - self._body.angle
+
+    def get_world_orientation(self, angle):
+        return self._body.angle + angle
+
+    def get_global_orientation(self, angle):
+        return self.get_world_orientation(angle)
 
     def get_local_pose(self, pose):
         return tuple((*self.get_local_point(pose[:2]), self.get_local_orientation(pose[2])))
 
-    def get_world_point(self, point):
-        return np.asarray(self._body.GetWorldPoint(_world_scale * np.asarray(point))) / _world_scale
+    def get_world_pose(self, pose):
+        return tuple((*self.get_world_point(pose[:2]), self.get_world_orientation(pose[2])))
 
-    def get_world_vector(self, vector):
-        return np.asarray(self._body.GetWorldVector(vector))
+    def get_global_pose(self, pose):
+        return self.get_world_pose(pose)
 
     def collides_with(self, other):
         for contact_edge in self._body.contacts_gen:

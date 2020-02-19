@@ -6,7 +6,8 @@ from gym_guppy.tools.reward_function import reward_function
 
 __all__ = [
     'goal_reward',
-    'relative_goal_reward'
+    'relative_goal_reward',
+    'robot_goal_reward'
 ]
 
 
@@ -16,6 +17,13 @@ def goal_reward(env: GuppyEnv, _state, _action, next_state):
     robot_id = env.robots_idx[0]
     mean_state = np.mean(extract_swarm_state(next_state, robot_id)[:, :2])
     return -np.linalg.norm(goal - mean_state)
+
+
+@reward_function
+def robot_goal_reward(env: GuppyEnv, _state, _action, _next_state):
+    goal = env.desired_goal
+    robot_pos = env.robot.get_position()
+    return -np.linalg.norm(goal - robot_pos)
 
 
 @reward_function

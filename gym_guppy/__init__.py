@@ -1,5 +1,5 @@
-from .envs import GuppyEnv
+from .envs import GuppyEnv, GoalGuppyEnv, VariableStepGuppyEnv
 from .guppies import Guppy, ClassicCouzinGuppy, BoostCouzinGuppy, AdaptiveCouzinGuppy, BiasedAdaptiveCouzinGuppy
-from .guppies import Robot, GoToRobot, TurnBoostRobot
+from .guppies import Robot, TurnBoostRobot, GlobalTargetRobot, PolarCoordinateTargetRobot
 from .wrappers import RayCastingWrapper, FrameStack, DiscreteActionWrapper, IgnorePastWallsWrapper
 from .reward import *

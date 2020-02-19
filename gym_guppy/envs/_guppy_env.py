@@ -17,11 +17,7 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
     metadata = {'render.modes': ['human', 'video', 'rgb_array'], 'video.frames_per_second': None}
 
     world_size = world_width, world_height = 1., 1.
-    # world_size = world_width, world_height = .5, .5
     screen_size = screen_width, screen_height = 800, 800
-
-    _observe_objects = False
-    _observe_light = True
 
     __sim_steps_per_second = 100
     __sim_velocity_iterations = 8
@@ -34,7 +30,7 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
 
     def __new__(cls, *args, **kwargs):
         cls.sim_steps_per_second = cls.__sim_steps_per_second
-        cls.sim_step = 1. / cls.__sim_steps_per_second
+        cls.step_time = 1. / cls.__sim_steps_per_second
         cls.world_x_range = -cls.world_width / 2, cls.world_width / 2
         cls.world_y_range = -cls.world_height / 2, cls.world_height / 2
         cls.world_bounds = (np.array([-cls.world_width / 2, -cls.world_height / 2]),
@@ -45,11 +41,12 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
 
         return super(GuppyEnv, cls).__new__(cls)
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, max_steps=None, *args, **kwargs):
         super(GuppyEnv, self).__init__(*args, **kwargs)
         self.__sim_steps = 0
         self.__action_steps = 0
         self.__reset_counter = 0
+        self._max_steps = max_steps
 
         # create the world in Box2D
         self.world = b2World(gravity=(0, 0), doSleep=True)
@@ -100,8 +97,22 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
         self._step_world()
 
     @property
-    def _sim_steps(self):
+    def sim_steps(self):
         return self.__sim_steps
+
+    @property
+    def _action_steps(self):
+        return self.__action_steps
+
+    @property
+    def _internal_sim_loop_condition(self):
+        return self.__action_steps < self.__steps_per_action
+
+    @property
+    def _max_steps_reached(self):
+        if self._max_steps is None:
+            return False
+        return self.__sim_steps >= self._max_steps
 
     @property
     def robots(self):
@@ -143,7 +154,7 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
         actions_low = np.asarray([r.action_space.low for r in self.robots])
         actions_high = np.asarray([r.action_space.high for r in self.robots])
 
-        return gym.spaces.Box(low=actions_low, high=actions_high)
+        return gym.spaces.Box(low=actions_low, high=actions_high, dtype=np.float64)
 
     def _get_observation_space(self):
         return self._get_state_space()
@@ -272,14 +283,14 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
 
         self.__action_steps = 0
 
-        while self._internal_sim_loop_condition():
+        while self._internal_sim_loop_condition and not self._max_steps_reached:
             self._compute_guppy_actions(state)
 
             for a in self.__agents:
-                a.step(self.sim_step)
+                a.step(self.step_time)
 
             # step world
-            self.world.Step(self.sim_step, self.__sim_velocity_iterations, self.__sim_position_iterations)
+            self.world.Step(self.step_time, self.__sim_velocity_iterations, self.__sim_position_iterations)
             # self.world.ClearForces()
 
             self.__sim_steps += 1
@@ -303,15 +314,12 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
         reward = self.get_reward(state, action, next_state)
 
         # done
-        done = self.has_finished(next_state, action)
+        done = self.has_finished(next_state, action) or self._max_steps_reached
 
         # info
         info = self.get_info(next_state, action)
 
         return observation, reward, done, info
-
-    def _internal_sim_loop_condition(self):
-        return self.__action_steps < self.__steps_per_action
 
     def _update_kdtree(self, state):
         self.kd_tree = cKDTree(state[:, :2])
@@ -322,7 +330,7 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
                 g.compute_next_action(state=state, kd_tree=self.kd_tree)
 
     def _step_world(self):
-        self.world.Step(self.sim_step, self.__sim_velocity_iterations, self.__sim_position_iterations)
+        self.world.Step(self.step_time, self.__sim_velocity_iterations, self.__sim_position_iterations)
         self.world.ClearForces()
 
         state = self.get_state()

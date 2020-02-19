@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from gym_guppy.envs import VariableStepGuppyEnv
-from gym_guppy.guppies import ToTargetRobot
+from gym_guppy.guppies import GlobalTargetRobot
 
 
 controller_params = {
@@ -24,11 +24,11 @@ class TestEnv(VariableStepGuppyEnv):
     world_size = world_width, world_height = 1., 1.
 
     def _reset(self):
-        self._add_robot(ToTargetRobot(world=self.world,
-                                      world_bounds=self.world_bounds,
-                                      position=np.array([-0.01584549, 0.02128319]),
-                                      orientation=2.4684281,
-                                      ctrl_params=controller_params))
+        self._add_robot(GlobalTargetRobot(world=self.world,
+                                          world_bounds=self.world_bounds,
+                                          position=np.array([-0.01584549, 0.02128319]),
+                                          orientation=2.4684281,
+                                          ctrl_params=controller_params))
 
 
 if __name__ == '__main__':

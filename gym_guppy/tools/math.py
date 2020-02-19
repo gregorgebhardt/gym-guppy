@@ -8,13 +8,13 @@ def normalize(x: np.ndarray):
     return x / np.sqrt((x ** 2).sum())
 
 
-@njit
+@njit(fastmath=True)
 def rotation(alpha):
     c, s = np.cos(alpha), np.sin(alpha)
     return np.array(((c, -s), (s, c)))
 
 
-@njit
+@njit(fastmath=True)
 def row_norm(matrix: np.ndarray):
     return np.sqrt(np.sum(matrix ** 2, axis=1))
 
@@ -26,7 +26,7 @@ def is_point_left(a, b, c):
     return (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]) > 0
 
 
-@njit
+@njit(fastmath=True)
 def get_local_poses(poses, relative_to):
     local_poses = poses - relative_to
     R = rotation(relative_to[2])
@@ -90,7 +90,7 @@ def _ray_casting_walls(fish_pose, world_bounds, ray_orientations):
     return intersections
 
 
-@njit
+@njit(fastmath=True)
 def compute_line_line_intersection(line1: np.ndarray, line2: np.ndarray):
     # check that the lines are given as 2d-arrays and convert if necessary
     line1 = np.atleast_2d(line1)

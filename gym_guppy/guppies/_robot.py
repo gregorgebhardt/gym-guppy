@@ -66,24 +66,12 @@ class GoToRobot(Robot, VelocityControlledAgent):
     #     super(GoToRobot, self).step(time_step)
 
 
-class ToTargetRobot(Robot, VelocityControlledAgent):
-    # _density = 10.0
-    # _friction = 0.1
-    # _angular_damping = .1
-    # _linear_damping = .1
-
+class GlobalTargetRobot(Robot, VelocityControlledAgent):
     def __init__(self, **kwargs):
-        super(ToTargetRobot, self).__init__(**kwargs)
-
+        super(GlobalTargetRobot, self).__init__(**kwargs)
         # set position epsilon to 1cm
         self._pos_eps = .02
-
-        world_width = self._world_bounds[1, 0] - self._world_bounds[0, 0]
-        world_height = self._world_bounds[1, 1] - self._world_bounds[0, 1]
-        world_diag = np.sqrt(world_width**2 + world_height**2)
-        # TODO: test action space
-        self._action_space = gym.spaces.Box(low=np.array((-world_diag, -world_diag)),
-                                            high=np.array((world_diag, world_diag)))
+        self._action_space = gym.spaces.Box(low=self._world_bounds[0], high=self._world_bounds[1])
 
     @property
     def action_space(self) -> gym.spaces.Box:
@@ -96,3 +84,16 @@ class ToTargetRobot(Robot, VelocityControlledAgent):
         pos_error = self._target - self.get_position()
         if np.linalg.norm(pos_error) < self._pos_eps:
             return True
+
+
+class PolarCoordinateTargetRobot(GlobalTargetRobot):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self._action_space = gym.spaces.Box(low=np.array((-np.pi, .0)),
+                                            high=np.array((np.pi, .3)),
+                                            dtype=np.float64)
+
+    def set_action(self, action):
+        local_target = np.array((np.sin(action[0]), np.cos(action[0]))) * action[1]
+        super(PolarCoordinateTargetRobot, self).set_action(self.get_global_point(local_target))
