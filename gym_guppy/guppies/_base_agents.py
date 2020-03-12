@@ -222,6 +222,10 @@ class VelocityControlledAgent(Agent, abc.ABC):
         self._pose_buffer = deque([(.0, .0, .0)] * self._pose_tau, maxlen=self._pose_tau)
         self._target_buffer = deque([np.array((.0, .0))] * self._pose_tau, maxlen=self._pose_tau)
 
+    @property
+    def two_wheels_controller(self):
+        return self._two_wheels_controller
+
     def step(self, time_step):
         if self._counter % 5 == 0:
             self._pose_buffer.append(self.get_pose())

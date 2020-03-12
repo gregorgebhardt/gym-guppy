@@ -133,6 +133,15 @@ class ControllerBase:
         self._pid = SaturatedPIDController(**pid_args)
         self._speed = speed
 
+    @property
+    def speed(self):
+        return self._speed
+
+    @speed.setter
+    def speed(self, speed):
+        assert .0 <= speed <= 1.
+        self._speed = speed
+
     def __call__(self, ori_error, pos_error):
         raise NotImplementedError
 
@@ -150,9 +159,19 @@ class ForwardController(ControllerBase):
         super(ForwardController, self).__init__(**kwargs)
 
         self._ori_gate_slope = ori_gate_slope
+        self.prev_ori_error = .0
 
     def _ori_gate(self, ori_error):
-        return 1 - sigmoid(np.abs(ori_error), self._ori_gate_slope)
+        ori_error = np.abs(ori_error)
+        p_part = 1 - sigmoid(ori_error, self._ori_gate_slope)
+
+        curr_err = 1. - sigmoid(ori_error, self._ori_gate_slope)
+        prev_err = 1. - sigmoid(self.prev_ori_error, self._ori_gate_slope)
+        self.prev_ori_error = ori_error
+        d_part = curr_err - prev_err
+        # d_part = .0
+
+        return p_part + d_part
 
     def __call__(self, ori_error, pos_error) -> MotorSpeeds:
         gate_value = self._ori_gate(ori_error)
@@ -171,20 +190,28 @@ class TwoWheelsController:
         self._ori_ctrl = TurnController(**ori_ctrl_params)
         self._fwd_ctrl = ForwardController(**fwd_ctrl_params)
 
+    @property
+    def ori_ctrl(self):
+        return self._ori_ctrl
+
+    @property
+    def fwd_ctrl(self):
+        return self._fwd_ctrl
+
     def speeds(self, pose, target):
         ori_error, pos_error = _compute_errors(pose, target)
 
-        turn_commands = self._ori_ctrl(ori_error, pos_error)
-        turn_commands.right = int(100*turn_commands.right)/100.
-        fwd_commands = self._fwd_ctrl(ori_error, pos_error)
+        turn_commands = self._ori_ctrl(ori_error, 100 * pos_error)
+        # turn_commands.right = int(100*turn_commands.right)/100.
+        fwd_commands = self._fwd_ctrl(ori_error, 100 * pos_error)
 
         return turn_commands + fwd_commands
 
     def speed_parts(self, pose, target):
         ori_error, pos_error = _compute_errors(pose, target)
 
-        turn_commands = self._ori_ctrl(ori_error, pos_error)
-        turn_commands.right = int(100*turn_commands.right)/100.
-        fwd_commands = self._fwd_ctrl(ori_error, pos_error)
+        turn_commands = self._ori_ctrl(ori_error, 100 * pos_error)
+        # turn_commands.right = int(100*turn_commands.right)/100.
+        fwd_commands = self._fwd_ctrl(ori_error, 100 * pos_error)
 
         return turn_commands, fwd_commands

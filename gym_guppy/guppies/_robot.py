@@ -67,18 +67,29 @@ class GoToRobot(Robot, VelocityControlledAgent):
 
 
 class GlobalTargetRobot(Robot, VelocityControlledAgent):
-    def __init__(self, **kwargs):
+    def __init__(self, modulated=False, **kwargs):
         super(GlobalTargetRobot, self).__init__(**kwargs)
         # set position epsilon to 1cm
         self._pos_eps = .02
-        self._action_space = gym.spaces.Box(low=self._world_bounds[0], high=self._world_bounds[1])
+        self._modulated = modulated
+
+        if self._modulated:
+            self._action_space = gym.spaces.Box(low=np.r_[self._world_bounds[0], .0],
+                                                high=np.r_[self._world_bounds[1], .2],
+                                                dtype=np.float64)
+        else:
+            self._action_space = gym.spaces.Box(low=self._world_bounds[0], high=self._world_bounds[1], dtype=np.float64)
 
     @property
     def action_space(self) -> gym.spaces.Box:
         return self._action_space
 
     def set_action(self, action):
-        self._target = action
+        if self._modulated:
+            self.two_wheels_controller.fwd_ctrl.speed = action[-1]
+            self._target = action[:-1]
+        else:
+            self._target = action
 
     def action_completed(self) -> bool:
         pos_error = self._target - self.get_position()
@@ -95,5 +106,5 @@ class PolarCoordinateTargetRobot(GlobalTargetRobot):
                                             dtype=np.float64)
 
     def set_action(self, action):
-        local_target = np.array((np.sin(action[0]), np.cos(action[0]))) * action[1]
+        local_target = np.array((np.cos(action[0]), np.sin(action[0]))) * action[1]
         super(PolarCoordinateTargetRobot, self).set_action(self.get_global_point(local_target))
