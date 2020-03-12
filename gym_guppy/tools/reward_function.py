@@ -9,7 +9,7 @@ from gym import Env
 
 _RewardFunctionT = Callable[[Env, np.ndarray, np.ndarray, np.ndarray], float]
 _RewardFunctionWithArgsT = Callable[[Env, np.ndarray, np.ndarray, np.ndarray, Any], float]
-_RewardWrapperT = Callable[[Env, float, Any], float]
+_RewardWrapperT = Callable[[float, Any], float]
 _InputWrapperT = Callable[[Env, np.ndarray, np.ndarray, np.ndarray, Any], Tuple[np.ndarray, np.ndarray, np.ndarray]]
 
 reward_registry = {}
@@ -144,7 +144,8 @@ class RewardFunction(RewardFunctionBase):
 
 
 class WrapperBase(RewardFunctionBase, abc.ABC):
-    def __init__(self, f: Union[_RewardWrapperT, _InputWrapperT], a: RewardFunctionBase, wrapper_args, wrapper_kwargs):
+    def __init__(self, f: Union[_RewardWrapperT, _InputWrapperT], a: RewardFunctionBase,
+                 wrapper_args=None, wrapper_kwargs=None):
         self._a = a
         self._f = f
         self._wrapper_args = wrapper_args if wrapper_args else ()
@@ -162,7 +163,8 @@ class WrapperBase(RewardFunctionBase, abc.ABC):
 
 
 class RewardWrapper(WrapperBase):
-    def __init__(self, f: _RewardWrapperT, a: RewardFunctionBase, wrapper_args, wrapper_kwargs):
+    def __init__(self, f: _RewardWrapperT, a: RewardFunctionBase,
+                 wrapper_args=None, wrapper_kwargs=None):
         super().__init__(f, a, wrapper_args, wrapper_kwargs)
 
     def __call__(self, env, state, action, next_state):

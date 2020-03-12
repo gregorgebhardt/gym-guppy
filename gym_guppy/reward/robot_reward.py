@@ -13,7 +13,8 @@ __all__ = ['negative_distance_to_swarm',
            'proximity_to_center_reward',
            'wall_avoidance_gate',
            'in_zor_gate',
-           'in_zoi_gate']
+           'in_zoi_gate',
+           'in_zoi_reward']
 
 
 @reward_function
@@ -133,3 +134,11 @@ def in_zoi_gate(env: GuppyEnv, _state, _action, next_state):
     robot_id = env.robots_idx[0]
     robot_swarm_dist = _robot_swarm_dist(next_state, robot_id)
     return 1. + np.mean(zoi - np.maximum(robot_swarm_dist, zoi))
+
+
+@reward_function
+def in_zoi_reward(env:GuppyEnv, _state, _action, next_state):
+    zoi = np.array([g.zoi for g in env.guppies])
+    robot_id = env.robots_idx[0]
+    robot_swarm_dist = _robot_swarm_dist(next_state, robot_id)
+    return np.sum(np.where(robot_swarm_dist <= zoi))
