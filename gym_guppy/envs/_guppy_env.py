@@ -135,7 +135,9 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
 
     @property
     def guppies(self):
-        return (self.__agents[g_idx] for g_idx in self.__guppies_idx)
+        for g_idx in self.__guppies_idx:
+            yield self.__agents[g_idx]
+        # return (self.__agents[g_idx] for g_idx in self.__guppies_idx)
         # return tuple(self.__guppies)
 
     @property
@@ -176,14 +178,17 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
         warnings.warn(f'Setting steps_per_action to {spa}')
         self.__steps_per_action = spa
 
-    def __add_agent(self, agent: Agent):
+    def __add_agent(self, agent: Agent, left=False):
         if agent in self.__agents:
             warnings.warn("Agent " + agent.id + " has already been registered before.")
             return False
 
         next_id = len(self.__agents)
         agent.set_id(next_id)
-        self.__agents.append(agent)
+        if left:
+            self.__agents.insert(0, agent)
+        else:
+            self.__agents.append(agent)
 
         return True
 
@@ -194,7 +199,7 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
         return False
 
     def _add_robot(self, robot: Agent):
-        if self.__add_agent(robot):
+        if self.__add_agent(robot, left=True):
             self.__robots_idx.append(robot.id)
             return True
         return False
@@ -231,7 +236,7 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
     def get_reward(self, state, action, new_state):
         return self._reward_function(state, action, new_state)
 
-    def has_finished(self, state, action):
+    def get_done(self, state, action):
         return False
 
     def get_info(self, state, action):
@@ -284,7 +289,9 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
         self.__action_steps = 0
 
         while self._internal_sim_loop_condition and not self._max_steps_reached:
-            self._compute_guppy_actions(state)
+            s = self.get_state()
+
+            self._compute_guppy_actions(s)
 
             for a in self.__agents:
                 a.step(self.step_time)
@@ -314,7 +321,7 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
         reward = self.get_reward(state, action, next_state)
 
         # done
-        done = self.has_finished(next_state, action) or self._max_steps_reached
+        done = self.get_done(next_state, action) or self._max_steps_reached
 
         # info
         info = self.get_info(next_state, action)
