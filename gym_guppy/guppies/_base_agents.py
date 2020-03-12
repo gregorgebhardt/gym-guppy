@@ -102,7 +102,7 @@ class TurnBoostAgent(Agent, abc.ABC):
         super().__init__(**kwargs)
 
         self._max_turn_per_step = np.pi / 4.
-        self._max_boost_per_step = .05
+        self._max_boost_per_step = .1
         self._max_turn = 4 * self._max_turn_per_step
         self._max_boost = 5 * self._max_boost_per_step
 

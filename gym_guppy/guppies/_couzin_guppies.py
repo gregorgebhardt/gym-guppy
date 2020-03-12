@@ -13,7 +13,7 @@ from gym_guppy.tools.math import rotation, row_norm
 _ZOR = 0.005  # zone of repulsion
 _ZOO = 0.09  # zone of orientation
 _ZOA = 1.0  # zone of attraction
-_FOP = np.deg2rad(270)  # field of perception
+_FOP = np.deg2rad(320)  # field of perception
 _ZOI = _ZOR + _ZOO + _ZOA
 
 _WALL_NORMALS = np.array([[1, 0],
@@ -48,6 +48,7 @@ def _compute_zone_indices(dist, phi, zor=_ZOR, zoo=_ZOO, zoa=_ZOA, field_of_perc
     i_r = np.logical_and(0.0 < dist, dist <= zor)
     i_o = np.logical_and(np.logical_and(zor < dist, dist <= zor + zoo), i_fop)
     i_a = np.logical_and(np.logical_and(zor + zoo < dist, dist <= zoa), i_fop)
+    # print(f"i_fop: {i_fop} n_r: {sum(i_r)}; n_o: {sum(i_o)}; n_a: {sum(i_a)} ", end='')
 
     return i_r, i_o, i_a, i_fop
 
@@ -83,6 +84,13 @@ def _compute_couzin_direction(local_positions, local_orientations, i_r, i_o, i_a
 
             d_theta /= denominator + 1.
 
+        if len(i_a) + len(i_o) == 0:
+            noise = np.random.normal() * .5
+            # print(f"adding noise: {noise} ", end='')
+            d_theta += noise
+
+    # print(f"d_theta: {d_theta} ", end='')
+
     return d_theta
 
 
@@ -117,6 +125,7 @@ def _wall_repulsion(self_pos, self_theta, world_bounds, zor=_ZOR):
             sign = 1
         theta_w += np.mean(sign * np.abs(_WALL_NORMALS_DIRECTION[close_walls])) - self_theta
 
+    # print(f"theta_w: {theta_w} ", end='')
     return theta_w
 
 
@@ -152,6 +161,8 @@ def _compute_couzin_boost_action(state, world_bounds, max_boost, zor=_ZOR, zoo=_
     if theta_w:
         theta_i += theta_w
         theta_i /= 2.
+
+    # print(f"theta_i: {theta_i} ", end='')
 
     return theta_i, boost_i
 
@@ -203,7 +214,9 @@ class BoostCouzinGuppy(BaseCouzinGuppy, TurnBoostAgent):
         out = _compute_couzin_boost_action(state[i, :], self._world_bounds, self._max_boost_per_step)
         d_theta, d_boost = out
         # d_theta, d_boost = _compute_couzin_boost_action(state, self.id, self._max_boost)
-        self.turn = d_theta + np.random.randn() * self._turn_noise
+        theta_noise = np.minimum(np.maximum(np.random.randn() * self._turn_noise, -.3), .3)
+        # print(f'theta_noise: {theta_noise}')
+        self.turn = d_theta + theta_noise
         # there is already noise on boost when no guppy in z_r
         self.boost = d_boost
 
