@@ -19,6 +19,7 @@ def row_norm(matrix: np.ndarray):
     return np.sqrt(np.sum(matrix ** 2, axis=1))
 
 
+@njit(fastmath=True)
 def is_point_left(a, b, c):
     """computes if c is left of the line ab.
     :return: True if c is left of the line ab and False otherwise.
@@ -35,8 +36,20 @@ def get_local_poses(poses, relative_to):
     return local_poses
 
 
+@njit(fastmath=True)
 def transform_sin_cos(radians):
-    return np.c_[np.sin(radians), np.cos(radians)]
+    rads = np.atleast_2d(radians).reshape(-1, 1)
+    return np.concatenate((np.sin(rads), np.cos(rads)), axis=-1)
+
+
+@njit(fastmath=True)
+def polar_coordinates(points):
+    # compute polar coordinates
+    pts = np.atleast_2d(points)
+    dist = row_norm(pts)
+    phi = np.arctan2(pts[:, 1], pts[:, 0])
+
+    return dist, phi
 
 
 def ray_casting_walls(fish_pose, world_bounds, ray_orientations, diagonal_length):
@@ -130,8 +143,8 @@ def compute_dist_bins(relative_to, poses, bin_boundaries, max_dist):
     local_positions = (poses[:, :2] - relative_to[:2]).dot(rot)
 
     # compute polar coordinates
-    dist = np.minimum(row_norm(local_positions), max_dist) / max_dist
-    phi = np.arctan2(local_positions[:, 1], local_positions[:, 0])
+    dist, phi = polar_coordinates(local_positions)
+    dist = np.minimum(dist, max_dist) / max_dist
 
     dist_array = np.ones(len(bin_boundaries) - 1)
     for i in range(len(poses)):

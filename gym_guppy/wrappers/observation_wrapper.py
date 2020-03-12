@@ -4,41 +4,139 @@ import gym
 import numpy as np
 
 from gym_guppy.guppies import AdaptiveCouzinGuppy
-from gym_guppy.tools.math import get_local_poses, transform_sin_cos, ray_casting_walls, compute_dist_bins
+from gym_guppy.tools.math import get_local_poses, transform_sin_cos, ray_casting_walls, compute_dist_bins, \
+    polar_coordinates
 from gym_guppy.tools.datastructures import LazyFrames
 
 
+class FlatObservationsWrapper(gym.ObservationWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+
+        self.observation_space = gym.spaces.Box(low=env.observation_space.low.flatten(),
+                                                high=env.observation_space.high.flatten(),
+                                                dtype=env.observation_space.dtype)
+
+    def observation(self, observation):
+        return observation.flatten()
+
+
+class GoalObservationWrapper(gym.ObservationWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+
+        low = np.r_[env.observation_space.low, self.world_bounds[0]]
+        high = np.r_[env.observation_space.high, self.world_bounds[1]]
+
+        self.observation_space = gym.spaces.Box(low, high, dtype=self.observation_space.dtype)
+
+    def observation(self, observation):
+        return np.r_[observation, self.env.desired_goal]
+
+
+class LocalGoalObservationWrapper(gym.ObservationWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+
+        diagonal = np.linalg.norm(self.world_bounds[0] - self.world_bounds[1])
+
+        low = np.r_[env.observation_space.low, -diagonal, -diagonal]
+        high = np.r_[env.observation_space.high, diagonal, diagonal]
+
+        self.observation_space = gym.spaces.Box(low, high, dtype=self.observation_space.dtype)
+
+    def observation(self, observation):
+        return np.r_[observation, self.robot.get_local_point(self.env.desired_goal)]
+
+
+class LocalPolarCoordinateGoalObservationWrapper(LocalGoalObservationWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+
+        self.observation_space.low[-2] = .0
+        self.observation_space.low[-1] = -np.pi
+        self.observation_space.high[-1] = np.pi
+
+    def observation(self, observation):
+        observation = super(LocalPolarCoordinateGoalObservationWrapper, self).observation(observation)
+        # since the LocalGoalObservationWrapper appends the goal position to the end of the row, we replace this
+        # point by its polar coordinates
+        observation[-2:] = polar_coordinates(observation[-2:])
+        return observation
+
+
 class LocalObservationsWrapper(gym.ObservationWrapper):
-    def __init__(self, env, robot_id=0):
+    def __init__(self, env, robot_id=0, observe_robot=True):
         super(LocalObservationsWrapper, self).__init__(env)
         self.robot_id = robot_id
+        self.observe_robot = observe_robot
         # assert action space is n x 3, where n > 1
         assert isinstance(self.env.observation_space, gym.spaces.Box)
         assert self.env.observation_space.shape[1] == 3
-        assert self.env.observation_space.shape[0] > 1
+        # assert self.env.observation_space.shape[0] > 1
 
-    def observation(self, observation):
+        diagonal = np.linalg.norm(self.world_bounds[0] - self.world_bounds[1])
+        bounds = np.tile([diagonal, diagonal, 1., 1.], (self.observation_space.shape[0], 1))
+
+        self.observation_space = gym.spaces.Box(low=-bounds, high=bounds,
+                                                dtype=self.observation_space.dtype)
+
+    def _split_poses(self, observation):
         robot_pose = observation[self.robot_id, :]
         guppy_pose = np.array([r for i, r in enumerate(observation) if i != self.robot_id])
+        return robot_pose, guppy_pose
 
-        local_poses = get_local_poses(guppy_pose, robot_pose)
-        return np.c_[local_poses[:, :2], transform_sin_cos(local_poses[:, [2]])]
+    def observation(self, observation):
+        robot_pose, guppy_pose = self._split_poses(observation)
+
+        if len(guppy_pose) > 0:
+            local_poses = get_local_poses(guppy_pose, robot_pose)
+            local_poses = np.c_[local_poses[:, :2], transform_sin_cos(local_poses[:, [2]])]
+        else:
+            local_poses = np.empty((0, 4))
+
+        if self.observe_robot:
+            robot_pose = np.c_[robot_pose[:2].reshape(1, -1), transform_sin_cos(robot_pose[2])]
+            local_poses = np.r_[robot_pose, local_poses]
+
+        return local_poses
+
+
+class LocalPolarCoordinateObservations(LocalObservationsWrapper):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.observation_space.low[1:, 1] = -np.pi
+        self.observation_space.low[1:, 0] = .0
+        self.observation_space.high[1:, 1] = np.pi
+
+    def observation(self, observation):
+        robot_pose, guppy_pose = self._split_poses(observation)
+
+        if len(guppy_pose) > 0:
+            local_poses = get_local_poses(guppy_pose, robot_pose)
+            d, phi = polar_coordinates(local_poses[:, :2])
+            local_poses = np.c_[d, phi, transform_sin_cos(local_poses[:, [2]])]
+        else:
+            local_poses = np.empty((0, 4))
+
+        if self.observe_robot:
+            robot_pose = np.c_[robot_pose[:2].reshape(1, -1), transform_sin_cos(robot_pose[2:3])]
+            local_poses = np.r_[robot_pose, local_poses]
+
+        return local_poses
 
 
 class RayCastingWrapper(gym.ObservationWrapper):
     def __init__(self, env, degrees=360, num_bins=36 * 2):
         super(RayCastingWrapper, self).__init__(env)
         # redefine observation space
-        self.observation_space = gym.spaces.Box(low=0.0, high=1.0, shape=(2, num_bins), dtype=np.float32)
-
-        # TODO: test if this leads to the same results
-        self.world_bounds = np.float32((self.env.world_bounds[0], self.env.world_bounds[1]))
-        self.world_bounds = np.float32(self.env.world_bounds)
+        self.observation_space = gym.spaces.Box(low=0.0, high=1.0, shape=(2, num_bins), dtype=np.float64)
 
         self.diagonal = np.linalg.norm(self.world_bounds[0] - self.world_bounds[1])
         self.cutoff = np.radians(degrees) / 2.0
-        self.sector_bounds = np.linspace(-self.cutoff, self.cutoff, num_bins + 1, dtype=np.float32)
-        self.ray_directions = np.linspace(-self.cutoff, self.cutoff, num_bins, dtype=np.float32)
+        self.sector_bounds = np.linspace(-self.cutoff, self.cutoff, num_bins + 1)
+        self.ray_directions = np.linspace(-self.cutoff, self.cutoff, num_bins)
         # TODO: is this faster than just recreating the array?
         self.obs_placeholder = np.empty(self.observation_space.shape)
 
@@ -155,7 +253,7 @@ class FrameStack(gym.ObservationWrapper):
 
     def _get_obs(self):
         assert len(self.frames) == self.k
-        return np.array(LazyFrames(list(self.frames)), dtype=np.float32)
+        return np.array(LazyFrames(list(self.frames)))
 
 
 class IgnorePastWallsWrapper(gym.ObservationWrapper):

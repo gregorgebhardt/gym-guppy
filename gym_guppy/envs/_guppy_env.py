@@ -165,7 +165,7 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
         state_high = np.concatenate([self.world_bounds[1], [np.inf]])
         state_high = np.tile(state_high, (self.num_robots + self.num_guppies, 1))
 
-        return gym.spaces.Box(low=state_low, high=state_high)
+        return gym.spaces.Box(low=state_low, high=state_high, dtype=np.float64)
 
     @property
     def _steps_per_action(self):

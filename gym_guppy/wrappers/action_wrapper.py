@@ -21,7 +21,8 @@ class FlatActionWrapper(gym.ActionWrapper):
         self._original_action_space = self.action_space
 
         self.action_space = gym.spaces.Box(low=self.action_space.low.flatten(),
-                                           high=self.action_space.high.flatten())
+                                           high=self.action_space.high.flatten(),
+                                           dtype=self.action_space.dtype)
 
     def action(self, action):
         return np.reshape(action, self._original_action_space.shape)
@@ -102,10 +103,23 @@ class RandomizeActionWrapper(gym.ActionWrapper):
 
 
 class Local2GlobalWrapper(gym.ActionWrapper):
+    def __init__(self, env, action_limit=1.):
+        super().__init__(env)
+
+        action_shape = env.action_space.shape
+        assert action_shape[-1] >= 2
+
+        action_bounds = np.ones(action_shape[:-1] + (2,)) * action_limit
+
+        self.action_space = gym.spaces.Box(low=np.c_[-action_bounds, env.action_space.low[:, 2:]],
+                                           high=np.c_[action_bounds, env.action_space.high[:, 2:]],
+                                           dtype=np.float64)
+
     def action(self, action):
         global_actions = []
         for r, a in zip(self.robots, action):
-            global_actions.append(r.get_global_point(action))
+            a = np.r_[r.get_global_point(a[:2]), a[2:]]
+            global_actions.append(a)
 
         return np.asarray(global_actions)
 
