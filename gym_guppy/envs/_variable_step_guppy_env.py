@@ -2,6 +2,7 @@ import abc
 
 import numpy as np
 
+from ._goal_guppy_env import GoalGuppyEnv
 from ._guppy_env import GuppyEnv
 
 
@@ -32,3 +33,9 @@ class VariableStepGuppyEnv(GuppyEnv, abc.ABC):
         steps = np.array(self._step_logger)
         self._step_logger = []
         return dict(steps=steps)
+
+
+class VariableStepGoalGuppyEnv(VariableStepGuppyEnv, GoalGuppyEnv, abc.ABC):
+    @property
+    def _internal_sim_loop_condition(self):
+        return (not self.goal_reached()) and super(VariableStepGoalGuppyEnv, self)._internal_sim_loop_condition

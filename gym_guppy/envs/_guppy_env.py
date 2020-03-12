@@ -326,6 +326,7 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
 
     def _compute_guppy_actions(self, state):
         if self.__sim_steps % self._guppy_steps_per_action == 0:
+            self._update_kdtree(state)
             for i, g in enumerate(self.guppies):
                 g.compute_next_action(state=state, kd_tree=self.kd_tree)
 
