@@ -120,10 +120,10 @@ def wall_avoidance_gate(env: GuppyEnv, _state, _action, next_state, epsilon):
 
 @reward_function
 def in_zor_gate(env: GuppyEnv, _state, _action, next_state):
-    from gym_guppy.guppies._couzin_guppies import _ZOR
+    zor = np.array([g.zor for g in env.guppies])
     robot_id = env.robots_idx[0]
     robot_swarm_dist = _robot_swarm_dist(next_state, robot_id)
-    if np.any(robot_swarm_dist <= _ZOR):
+    if np.any(robot_swarm_dist <= zor):
         return 0.
     return 1.
 
@@ -141,4 +141,4 @@ def in_zoi_reward(env:GuppyEnv, _state, _action, next_state):
     zoi = np.array([g.zoi for g in env.guppies])
     robot_id = env.robots_idx[0]
     robot_swarm_dist = _robot_swarm_dist(next_state, robot_id)
-    return np.sum(np.where(robot_swarm_dist <= zoi))
+    return np.sum(robot_swarm_dist <= zoi)

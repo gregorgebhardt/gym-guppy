@@ -246,14 +246,17 @@ class AdaptiveCouzinGuppy(BoostCouzinGuppy):
         self._adaptive_zone_factors = np.array([self._initial_zone_factor] * len(self._unknown_agents))
         self._zone_radius = self._zone_radius_mean + np.random.rand() * self._zone_radius_noise
 
-        self._zone_cache = self.adaptive_couzin_zones()
+        self._update_zones()
 
-    def adaptive_couzin_zones(self):
+    def _update_zones(self):
         zor = self._zone_radius * self._adaptive_zone_factors
         zoo = (self._zone_radius - zor) * self._adaptive_zone_factors
         zoa = self._zone_radius - zoo - zor
-        # print('couzin_zones', zor, zoo, zoa)
-        return zor, zoo, zoa
+
+        self._zone_cache = zor, zoo, zoa
+
+    def adaptive_couzin_zones(self):
+        return self._zone_cache
 
     def compute_next_action(self, state: np.ndarray, kd_tree: cKDTree = None):
         k = min(self._k_neighbors, len(state))
@@ -272,11 +275,11 @@ class AdaptiveCouzinGuppy(BoostCouzinGuppy):
         unknown_agents_state = state[unknown_agents_ids]
 
         # compute zones with current factors
-        adaptive_zones = self.adaptive_couzin_zones()
+        self._update_zones()
 
         # adapt zone factors
         for ua_id, ua_state in zip(unknown_agents_ids, unknown_agents_state):
-            zor = adaptive_zones[0][ua_id]
+            zor = self._zone_cache[0][ua_id]
             # if robot is in fish's zor increase zor
             if np.linalg.norm(state[ua_id, :2] - state[self.id, :2]) < zor:
                 self._adaptive_zone_factors[ua_id] = min(
@@ -286,9 +289,9 @@ class AdaptiveCouzinGuppy(BoostCouzinGuppy):
                 self._adaptive_zone_factors[ua_id] = max(
                     .2, self._adaptive_zone_shrink_factor * self._adaptive_zone_factors[ua_id])
 
-        adaptive_zones = self.adaptive_couzin_zones()
+        self._update_zones()
         d_theta_unknown, d_boost_unknown = .0, .0
-        for i, (ua_id, zor, zoo, zoa) in enumerate(zip(self._unknown_agents_ids, *adaptive_zones)):
+        for i, (ua_id, zor, zoo, zoa) in enumerate(zip(self._unknown_agents_ids, *self._zone_cache)):
             d_theta_i, d_boost_i = _compute_couzin_boost_action(state[[self.id, ua_id]], self._world_bounds,
                                                                 self._max_boost_per_step, zor, zoo, zoa)
             d_theta_unknown += d_theta_i
