@@ -1,13 +1,14 @@
 import abc
 import types
 import warnings
-from typing import Union
+from typing import Union, Iterator
 
 import gym
 import numpy as np
 from Box2D import b2PolygonShape, b2Vec2, b2World
 from scipy.spatial import cKDTree
 
+from gym_guppy import Robot
 from gym_guppy.bodies import Body, _world_scale
 from gym_guppy.guppies import Agent, Guppy
 from gym_guppy.tools.reward_function import RewardConst, RewardFunctionBase, reward_registry
@@ -115,8 +116,10 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
         return self.__sim_steps >= self._max_steps
 
     @property
-    def robots(self):
-        return (self.__agents[r_idx] for r_idx in self.__robots_idx)
+    def robots(self) -> Iterator[Robot]:
+        for r_idx in self.__robots_idx:
+            yield self.__agents[r_idx]
+        # return (self.__agents[r_idx] for r_idx in self.__robots_idx)
 
     @property
     def robot(self):
@@ -134,7 +137,7 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
         return len(self.__robots_idx)
 
     @property
-    def guppies(self):
+    def guppies(self) -> Iterator[Guppy]:
         for g_idx in self.__guppies_idx:
             yield self.__agents[g_idx]
         # return (self.__agents[g_idx] for g_idx in self.__guppies_idx)
@@ -198,8 +201,9 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
             return True
         return False
 
-    def _add_robot(self, robot: Agent):
-        if self.__add_agent(robot, left=True):
+    def _add_robot(self, robot: Robot):
+        # if self.__add_agent(robot, left=True):
+        if self.__add_agent(robot):
             self.__robots_idx.append(robot.id)
             return True
         return False

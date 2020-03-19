@@ -6,11 +6,17 @@ from ._adaptive_agent import AdaptiveAgent
 from ._randomized_guppies import RandomizedCouzinGuppy
 
 __all__ = [
+    'Agent',
+    'Guppy',
     'ClassicCouzinGuppy',
     'BoostCouzinGuppy',
     'AdaptiveCouzinGuppy',
     'BiasedAdaptiveCouzinGuppy',
-    'RandomizedCouzinGuppy'
+    'RandomizedCouzinGuppy',
+    'Robot',
+    'TurnBoostRobot',
+    'GlobalTargetRobot',
+    'PolarCoordinateTargetRobot'
 ]
 
 import importlib.util
