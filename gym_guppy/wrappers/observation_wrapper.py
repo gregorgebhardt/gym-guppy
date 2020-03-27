@@ -185,7 +185,7 @@ class TrackAdaptiveZones(gym.ObservationWrapper):
         return observation
 
     def zones(self):
-        return np.array([g.adaptive_couzin_zones() for g in self.env.guppies
+        return np.array([g.couzin_zones for g in self.env.guppies
                          if isinstance(g, AdaptiveCouzinGuppy)]).flatten()
 
 

@@ -12,7 +12,7 @@ from gym_guppy.tools.math import rotation, row_norm
 
 _ZOR = 0.005  # zone of repulsion
 _ZOO = 0.09  # zone of orientation
-_ZOA = 1.0  # zone of attraction
+_ZOA = 0.4  # zone of attraction
 _FOP = np.deg2rad(320)  # field of perception
 _ZOI = _ZOR + _ZOO + _ZOA
 
@@ -47,7 +47,7 @@ def _compute_zone_indices(dist, phi, zor=_ZOR, zoo=_ZOO, zoa=_ZOA, field_of_perc
 
     i_r = np.logical_and(0.0 < dist, dist <= zor)
     i_o = np.logical_and(np.logical_and(zor < dist, dist <= zor + zoo), i_fop)
-    i_a = np.logical_and(np.logical_and(zor + zoo < dist, dist <= zoa), i_fop)
+    i_a = np.logical_and(np.logical_and(zor + zoo < dist, dist <= zor + zoo + zoa), i_fop)
     # print(f"i_fop: {i_fop} n_r: {sum(i_r)}; n_o: {sum(i_o)}; n_a: {sum(i_a)} ", end='')
 
     return i_r, i_o, i_a, i_fop
@@ -184,6 +184,10 @@ class BaseCouzinGuppy(Guppy, abc.ABC):
     def zoi(self):
         return _ZOI
 
+    @property
+    def couzin_zones(self):
+        return _ZOR, _ZOO, _ZOA
+
 
 class ClassicCouzinGuppy(BaseCouzinGuppy, ConstantVelocityAgent):
     def __init__(self, **kwargs):
@@ -255,8 +259,9 @@ class AdaptiveCouzinGuppy(BoostCouzinGuppy):
 
         self._zone_cache = zor, zoo, zoa
 
-    def adaptive_couzin_zones(self):
-        return self._zone_cache
+    @property
+    def couzin_zones(self):
+        return self.zor, self.zoo, self.zoa
 
     def compute_next_action(self, state: np.ndarray, kd_tree: cKDTree = None):
         k = min(self._k_neighbors, len(state))
@@ -311,19 +316,19 @@ class AdaptiveCouzinGuppy(BoostCouzinGuppy):
 
     @property
     def zor(self):
-        return self._zone_cache[0]
+        return self._zone_cache[0].squeeze()
 
     @property
     def zoo(self):
-        return self._zone_cache[1]
+        return self._zone_cache[1].squeeze()
 
     @property
     def zoa(self):
-        return self._zone_cache[2]
+        return self._zone_cache[2].squeeze()
 
     @property
     def zoi(self):
-        return sum(self._zone_cache)
+        return np.sum(self._zone_cache, axis=-1).squeeze()
 
 
 class BiasedAdaptiveCouzinGuppy(AdaptiveCouzinGuppy):

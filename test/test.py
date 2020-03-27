@@ -52,7 +52,7 @@ class TestEnv(GuppyEnv):
     def _draw_on_table(self, screen):
         for g in self.guppies:
             if isinstance(g, AdaptiveCouzinGuppy):
-                zors, zoos, zoas = g.adaptive_couzin_zones()
+                zors, zoos, zoas = g.couzin_zones
 
                 width = .002
                 for zor, zoo, zoa in zip(zors, zoos, zoas):

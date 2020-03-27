@@ -35,12 +35,12 @@ class RandomizedCouzinGuppy(BiasedAdaptiveCouzinGuppy):
         self._zoo_factor = 1.0 + np.abs(rng.randn()) * zoo_factor_noise
 
     # overrides parent method
-    def adaptive_couzin_zones(self):
+    def _update_zones(self):
         zor = self._zone_radius * self._adaptive_zone_factors
         zoo = (self._zone_radius - zor) * self._adaptive_zone_factors * self._zoo_factor
         zoa = self._zone_radius - zoo - zor
-        # print('couzin_zones', zor, zoo, zoa)
-        return zor, zoo, zoa
+
+        self._zone_cache = zor, zoo, zoa
 
     @property
     def dr_parameter_list(self):

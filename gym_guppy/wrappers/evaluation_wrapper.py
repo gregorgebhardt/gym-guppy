@@ -69,7 +69,7 @@ class EvaluationWrapper(gym.Wrapper):
         self.group['distance_to_fish'][self.step_counter] = distance_to_fish(current_state)
 
         guppy = next(self.env.guppies)
-        self.group['zones_size'][self.step_counter] = np.array(guppy.adaptive_couzin_zones(),
+        self.group['zones_size'][self.step_counter] = np.array(guppy.couzin_zones,
                                                                dtype=np.float32).flatten()
         self.step_counter += 1
 
@@ -102,7 +102,7 @@ class OmniscienceWrapper(gym.Wrapper):
         dr_parameters = np.array \
             ([g.dr_parameter_list for g in self.env.guppies if isinstance(g, RandomizedCouzinGuppy)]).flatten()
         zones = np.array \
-            ([g.adaptive_couzin_zones() for g in self.env.guppies if isinstance(g, AdaptiveCouzinGuppy)]).flatten()
+            ([g.couzin_zones for g in self.env.guppies if isinstance(g, AdaptiveCouzinGuppy)]).flatten()
         time_left = np.array([(self.max_time_steps - self.t) / self.max_time_steps]).flatten()
         info = np.concatenate((dr_parameters, zones, time_left), axis=0)
         print(info.shape)
