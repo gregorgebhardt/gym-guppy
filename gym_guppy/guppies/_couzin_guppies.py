@@ -95,19 +95,24 @@ def _compute_couzin_direction(local_positions, local_orientations, i_r, i_o, i_a
 
 
 @njit(fastmath=True)
-def _compute_couzin_boost(local_positions, max_boost, i_r, i_o, i_a):
+def _compute_couzin_boost(local_positions, max_boost, i_r, i_o, i_a, approach_norm=1.):
     if np.any(i_r):
-        d_boost = 0.5 * max_boost * i_r.sum() / len(local_positions)
-    else:
+        # d_boost = 0.5 * max_boost * i_r.sum() / len(local_positions)
+        d_boost = max_boost
+    elif np.any(i_o) or np.any(i_a):
         n_o = i_o.sum()
         n_a = i_a.sum()
 
-        d_boost = (n_o + 1) * np.random.wald(0.05 * max_boost, 0.2 * max_boost)
+        d_boost = n_o * np.random.wald(0.001, 0.05)
 
         if n_a:
-            d_boost += np.linalg.norm(np.sum(local_positions[i_a], axis=0)) * .2 * max_boost
+            d_boost += np.linalg.norm(np.sum(local_positions[i_a], axis=0)) / approach_norm * max_boost
 
-        d_boost /= n_a + n_o + 1
+        d_boost /= n_a + n_o
+    else:
+        d_boost = .0
+
+    d_boost += np.random.wald(0.0005, 0.05)
 
     return d_boost
 
@@ -154,7 +159,7 @@ def _compute_couzin_boost_action(state, world_bounds, max_boost, zor=_ZOR, zoo=_
     i_r, i_o, i_a, i_fop = _compute_zone_indices(dist, phi, zor, zoo, zoa, field_of_perception)
 
     theta_i = _compute_couzin_direction(local_positions, local_orientations, i_r, i_o, i_a)
-    boost_i = _compute_couzin_boost(local_positions, max_boost, i_r, i_o, i_a)
+    boost_i = _compute_couzin_boost(local_positions, max_boost, i_r, i_o, i_a, zor + zoo + zoa)
 
     # check for walls
     theta_w = _wall_repulsion(state[0, :2], state[0, 2], world_bounds, .03)
@@ -226,13 +231,16 @@ class BoostCouzinGuppy(BaseCouzinGuppy, TurnBoostAgent):
 
 
 class AdaptiveCouzinGuppy(BoostCouzinGuppy):
-    _initial_zone_factor = .7
+    _initial_zone_factor = .95
+    _max_zone_factor = 1.
+    _min_zone_factor = .15
+    _zoo_factor = 2.
 
-    _zone_radius_mean = 0.25
+    _zone_radius_mean = 0.3
     _zone_radius_noise = 0.01
     
     _adaptive_zone_grow_factor = 1.05
-    _adaptive_zone_shrink_factor = 0.985
+    _adaptive_zone_shrink_factor = 0.99
 
     def __init__(self, *, unknown_agents: List[Agent] = None, **kwargs):
         super().__init__(**kwargs)
@@ -254,7 +262,7 @@ class AdaptiveCouzinGuppy(BoostCouzinGuppy):
 
     def _update_zones(self):
         zor = self._zone_radius * self._adaptive_zone_factors
-        zoo = (self._zone_radius - zor) * self._adaptive_zone_factors
+        zoo = (self._zone_radius - zor) * min(self._adaptive_zone_factors * self._zoo_factor, self._max_zone_factor)
         zoa = self._zone_radius - zoo - zor
 
         self._zone_cache = zor, zoo, zoa
@@ -273,7 +281,7 @@ class AdaptiveCouzinGuppy(BoostCouzinGuppy):
         known_agents_ids = [i for i in sorted_state_i if i not in self._unknown_agents_ids]
         known_agents_state = state[known_agents_ids]
         d_theta_known, d_boost_known = _compute_couzin_boost_action(known_agents_state, self._world_bounds,
-                                                                    self._max_boost_per_step)
+                                                                    self._max_boost)
         d_theta_known += np.random.randn() * self._turn_noise
 
         unknown_agents_ids = [i for i in sorted_state_i if i in self._unknown_agents_ids]
@@ -288,17 +296,17 @@ class AdaptiveCouzinGuppy(BoostCouzinGuppy):
             # if robot is in fish's zor increase zor
             if np.linalg.norm(state[ua_id, :2] - state[self.id, :2]) < zor:
                 self._adaptive_zone_factors[ua_id] = min(
-                    1., self._adaptive_zone_factors[ua_id] * self._adaptive_zone_grow_factor)
+                    self._max_zone_factor, self._adaptive_zone_factors[ua_id] * self._adaptive_zone_grow_factor)
             # else decrease zor
             else:
                 self._adaptive_zone_factors[ua_id] = max(
-                    .2, self._adaptive_zone_shrink_factor * self._adaptive_zone_factors[ua_id])
+                    self._min_zone_factor, self._adaptive_zone_shrink_factor * self._adaptive_zone_factors[ua_id])
 
         self._update_zones()
         d_theta_unknown, d_boost_unknown = .0, .0
         for i, (ua_id, zor, zoo, zoa) in enumerate(zip(self._unknown_agents_ids, *self._zone_cache)):
             d_theta_i, d_boost_i = _compute_couzin_boost_action(state[[self.id, ua_id]], self._world_bounds,
-                                                                self._max_boost_per_step, zor, zoo, zoa)
+                                                                self._max_boost, zor, zoo, zoa)
             d_theta_unknown += d_theta_i
             d_boost_unknown += d_boost_i
 
