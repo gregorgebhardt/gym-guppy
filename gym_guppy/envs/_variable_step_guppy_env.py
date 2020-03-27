@@ -4,6 +4,7 @@ import numpy as np
 
 from ._goal_guppy_env import GoalGuppyEnv
 from ._guppy_env import GuppyEnv
+from ..guppies._couzin_guppies import BaseCouzinGuppy
 
 
 class VariableStepGuppyEnv(GuppyEnv, abc.ABC):
@@ -13,6 +14,7 @@ class VariableStepGuppyEnv(GuppyEnv, abc.ABC):
         self._min_steps_per_action = min_steps_per_action
         self._max_steps_per_action = max_steps_per_action
         self._step_logger = []
+        self.enable_step_logging = True
 
     @property
     def _max_steps_per_action_reached(self):
@@ -30,9 +32,15 @@ class VariableStepGuppyEnv(GuppyEnv, abc.ABC):
                 (self.robot.action_completed() or self._max_steps_per_action_reached):
             return False
         else:
-            time = self.sim_steps * self.step_time
-            self._step_logger.append((time,) + tuple(self.get_state().flat) +
-                                     (*self.robot.get_linear_velocity(), self.robot.get_angular_velocity()))
+            if self.enable_step_logging:
+                time = self.sim_steps * self.step_time
+                log_tuple = (time,)
+                log_tuple += tuple(self.get_state().flat)
+                log_tuple += (*self.robot.get_linear_velocity(), self.robot.get_angular_velocity())
+                for g in self.guppies:
+                    if isinstance(g, BaseCouzinGuppy):
+                        log_tuple += g.couzin_zones
+                self._step_logger.append(log_tuple)
             return True
 
     def get_info(self, state, action):
