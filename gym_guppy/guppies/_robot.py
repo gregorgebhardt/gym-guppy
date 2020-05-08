@@ -102,7 +102,8 @@ class PolarCoordinateTargetRobot(GlobalTargetRobot):
         super().__init__(**kwargs)
 
         self._action_space = gym.spaces.Box(low=np.array((-np.pi, .0)),
-                                            high=np.array((np.pi, .3)),
+                                            # TODO this was initially set to .3
+                                            high=np.array((np.pi, .15)),
                                             dtype=np.float64)
 
     def set_action(self, action):
