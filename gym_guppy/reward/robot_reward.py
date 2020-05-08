@@ -110,6 +110,14 @@ def proximity_to_center_reward(env: GuppyEnv, _state, _action, next_state, half_
 
 
 @reward_function_with_args
+def near_walls_punishment(env: GuppyEnv, _state, _action, next_state, epsilon):
+    min_wall_dist = np.min(np.abs(np.asarray(env.world_bounds) - next_state[env.robots_idx[0], :2]))
+    if min_wall_dist < epsilon:
+        return -0.1
+    return .0
+
+
+@reward_function_with_args
 # @jit
 def wall_avoidance_gate(env: GuppyEnv, _state, _action, next_state, epsilon):
     min_wall_dist = np.min(np.abs(np.asarray(env.world_bounds) - next_state[env.robots_idx[0], :2]))
