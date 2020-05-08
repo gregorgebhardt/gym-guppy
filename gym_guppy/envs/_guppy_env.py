@@ -37,7 +37,7 @@ class GuppyEnv(gym.Env, metaclass=abc.ABCMeta):
         cls.world_bounds = (np.array([-cls.world_width / 2, -cls.world_height / 2]),
                             np.array([cls.world_width / 2, cls.world_height / 2]))
 
-        cls.__fps = cls.__sim_steps_per_second / cls.__steps_per_action
+        cls.__fps = 25
         cls.metadata['video.frames_per_second'] = cls.__sim_steps_per_second / cls.__steps_per_action
 
         return super(GuppyEnv, cls).__new__(cls)
