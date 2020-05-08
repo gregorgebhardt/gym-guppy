@@ -2,6 +2,7 @@ from itertools import cycle
 
 import numpy as np
 from gym_guppy import VariableStepGuppyEnv, PolarCoordinateTargetRobot, BoostCouzinGuppy, GlobalTargetRobot
+from gym_guppy.wrappers.evaluation_wrapper import FeedbackInspectionWrapper
 
 
 class TestEnv(VariableStepGuppyEnv):
@@ -41,15 +42,15 @@ class TestEnv(VariableStepGuppyEnv):
             ))
 
 
-target_points = [[-.3, .3],
-                 [.3, .3],
-                 [.3, -.3],
-                 [-.3, -.3],
-                 [-.3, .3]]
+target_points = np.array([[-.3, .3],
+                          [.3, .3],
+                          [.3, -.3],
+                          [-.3, -.3],
+                          [-.3, .3]])
 
 if __name__ == '__main__':
     # env = LocalObservationsWrapper(TestEnv())
-    env = TestEnv()
+    env = FeedbackInspectionWrapper(TestEnv())
     env.reset()
     # env.video_path = 'video_out'
 
@@ -58,4 +59,4 @@ if __name__ == '__main__':
 
         # state_t, reward_t, done, info = env.step(np.array([1.366212, 0.859359]))
         # state_t, reward_t, done, info = env.step(env.action_space.sample())
-        state_t, reward_t, done, info = env.step(a)
+        observation_t, reward_t, done, info = env.step(a)

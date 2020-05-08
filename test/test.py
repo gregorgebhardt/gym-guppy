@@ -1,6 +1,6 @@
 import os
 
-from gym_guppy import TurnBoostRobot
+from gym_guppy import BaseCouzinGuppy, TurnBoostRobot
 from gym_guppy.guppies import BoostCouzinGuppy, AdaptiveCouzinGuppy, BiasedAdaptiveCouzinGuppy
 from gym_guppy.guppies import AdaptiveAgent
 from gym_guppy.wrappers import LocalObservationsWrapper
@@ -10,14 +10,14 @@ from gym_guppy.wrappers import LocalObservationsWrapper
 import numpy as np
 from gym_guppy.envs import GuppyEnv
 
-h5file = '/Users/gregor/Downloads/data/training/eyj_2_lstm_100_zero_30_live_female_female_20190913T141403U264471.hdf5'
+# h5file = '/Users/gregor/Downloads/data/training/eyj_2_lstm_100_zero_30_live_female_female_20190913T141403U264471.hdf5'
 
 
 class TestEnv(GuppyEnv):
     def _reset(self):
         self._steps_per_action = 4
-        adaptive_agent = AdaptiveAgent(world=self.world, world_bounds=self.world_bounds)
-        self._add_robot(adaptive_agent)
+        # adaptive_agent = AdaptiveAgent(world=self.world, world_bounds=self.world_bounds)
+        # self._add_robot(adaptive_agent)
         # self._add_robot(TurnBoostRobot(world=self.world, world_bounds=self.world_bounds,
         #                                position=np.array([-0.4980772, -0.30953531]), orientation=1.5089165))
 
@@ -38,39 +38,39 @@ class TestEnv(GuppyEnv):
             #                                           # attraction_points=[[.0, .0]],
             #                                           repulsion_points=[[.0, .0]]
             #                                           ))
-            # self._add_guppy(BoostCouzinGuppy(world=self.world, world_bounds=self.world_bounds,
-            #                                  position=p, orientation=o))
-            self._add_guppy(BiasedAdaptiveCouzinGuppy(world=self.world, world_bounds=self.world_bounds,
-                                                      position=p, orientation=o,
-                                                      attraction_points=attraction_points,
-                                                      repulsion_points=repulsion_points,
-                                                      bias_gain=.7, unknown_agents=[adaptive_agent]))
+            self._add_guppy(BoostCouzinGuppy(world=self.world, world_bounds=self.world_bounds,
+                                             position=p, orientation=o))
+            # self._add_guppy(BiasedAdaptiveCouzinGuppy(world=self.world, world_bounds=self.world_bounds,
+            #                                           position=p, orientation=o,
+            #                                           attraction_points=attraction_points,
+            #                                           repulsion_points=repulsion_points,
+            #                                           bias_gain=.7, unknown_agents=[adaptive_agent]))
             # self._add_guppy(MXNetGuppy(world=self.world, world_bounds=self.world_bounds,
             #                            position=p, orientation=o,
             #                            hdf_file=h5file))
 
     def _draw_on_table(self, screen):
         for g in self.guppies:
-            if isinstance(g, AdaptiveCouzinGuppy):
-                zors, zoos, zoas = g.couzin_zones
+            if isinstance(g, BaseCouzinGuppy):
+                zor, zoo, zoa = g.couzin_zones
 
                 width = .002
-                for zor, zoo, zoa in zip(zors, zoos, zoas):
-                    screen.draw_circle(g.get_position(), zor + zoo + zoa, color=(0, 100, 0), filled=False, width=width)
-                    if zoo + zor > width:
-                        screen.draw_circle(g.get_position(), zor + zoo, color=(50, 100, 100), filled=False, width=width)
-                    if zor > width:
-                        screen.draw_circle(g.get_position(), zor, color=(100, 0, 0), filled=False, width=width)
+
+                screen.draw_circle(g.get_position(), zor + zoo + zoa, color=(0, 100, 0), filled=False, width=width)
+                if zoo + zor > width:
+                    screen.draw_circle(g.get_position(), zor + zoo, color=(50, 100, 100), filled=False, width=width)
+                if zor > width:
+                    screen.draw_circle(g.get_position(), zor, color=(100, 0, 0), filled=False, width=width)
 
 
 if __name__ == '__main__':
     # env = LocalObservationsWrapper(TestEnv())
     env = TestEnv()
     env.reset()
-    # env.video_path = 'video_out'
+    env.video_path = 'video_out'
 
     for t in range(2000):
-        env.render(mode='human')
+        env.render(mode='video')
 
         # state_t, reward_t, done, info = env.step(np.array([1.366212, 0.859359]))
         state_t, reward_t, done, info = env.step(.0)

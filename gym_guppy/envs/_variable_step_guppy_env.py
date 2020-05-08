@@ -15,6 +15,7 @@ class VariableStepGuppyEnv(GuppyEnv, abc.ABC):
         self._max_steps_per_action = max_steps_per_action
         self._step_logger = []
         self.enable_step_logging = True
+        self._reset_step_logger = False
 
     @property
     def _max_steps_per_action_reached(self):
@@ -33,6 +34,9 @@ class VariableStepGuppyEnv(GuppyEnv, abc.ABC):
             return False
         else:
             if self.enable_step_logging:
+                if self._reset_step_logger:
+                    self._step_logger = []
+                    self._reset_step_logger = False
                 time = self.sim_steps * self.step_time
                 log_tuple = (time,)
                 log_tuple += tuple(self.get_state().flat)
@@ -45,7 +49,7 @@ class VariableStepGuppyEnv(GuppyEnv, abc.ABC):
 
     def get_info(self, state, action):
         steps = np.array(self._step_logger)
-        self._step_logger = []
+        self._reset_step_logger = True
         return dict(steps=steps)
 
 
