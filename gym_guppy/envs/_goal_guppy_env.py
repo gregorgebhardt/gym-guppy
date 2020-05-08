@@ -6,19 +6,24 @@ from ._guppy_env import GuppyEnv
 
 
 class GoalGuppyEnv(GuppyEnv, abc.ABC):
+    def __init__(self, *, change_goal_threshold=.05, **kwargs):
+        super(GoalGuppyEnv, self).__init__(**kwargs)
+        self.change_goal_threshold = change_goal_threshold
+
     @property
     @abc.abstractmethod
     def desired_goal(self):
         raise NotImplementedError
 
     @property
-    @abc.abstractmethod
     def achieved_goal(self):
-        raise NotImplementedError
+        if self.num_guppies:
+            return np.mean([g.get_position() for g in self.guppies], axis=0)
+        else:
+            return self.robot.get_position()
 
-    @abc.abstractmethod
     def goal_reached(self) -> bool:
-        raise NotImplementedError
+        return np.linalg.norm(self.desired_goal - self.achieved_goal) <= self.change_goal_threshold
 
     @abc.abstractmethod
     def _update_goal(self):
@@ -29,3 +34,6 @@ class GoalGuppyEnv(GuppyEnv, abc.ABC):
         if self.goal_reached():
             self._update_goal()
         return ret_val
+
+    def get_done(self, state, action):
+        return self.goal_reached()
