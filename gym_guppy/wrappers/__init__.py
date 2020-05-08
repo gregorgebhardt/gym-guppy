@@ -3,5 +3,5 @@ from .action_wrapper import DiscreteActionWrapper, FlatActionWrapper, MovementLi
 from .observation_wrapper import LocalObservationsWrapper, RayCastingWrapper, FrameStack, IgnorePastWallsWrapper, \
     TrackAdaptiveZones, TimeWrapper, TimeWrapper2, RayCastingGoalWrapper, FlatObservationsWrapper, \
     GoalObservationWrapper, LocalGoalObservationWrapper, LocalPolarCoordinateObservations, \
-    LocalPolarCoordinateGoalObservationWrapper
+    LocalPolarCoordinateGoalObservationWrapper, FeedbackInspectionWrapper
 from .evaluation_wrapper import EvaluationWrapper, OmniscienceWrapper

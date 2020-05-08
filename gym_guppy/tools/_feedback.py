@@ -12,24 +12,25 @@ class Feedback:
         self._alpha_fear = .5
         self._alpha_follow = .5
 
-        self._fear_value_recorder = deque(maxlen=length)
-        self._fear_average_recorder = deque(maxlen=length)
-        self._follow_value_recorder = deque(maxlen=length)
-        self._follow_average_recorder = deque(maxlen=length)
-
         self._alphaE = 0.0025
         self._alphaO = 0.005
 
         self._fear_scaling = 8.0
         self._follow_scaling = 2.0
 
-        self._guppy_history = PoseHistory(maxlen=length)
-        self._robot_history = PoseHistory(maxlen=length)
-
         self._leading_zone = 0.28
 
         self._safe_speed = 0.03
         self._panic_speed = 0.2
+
+        init_fear_recorder = [.5] * length
+        self._fear_value_recorder = deque(init_fear_recorder, maxlen=length)
+
+        init_follow_recorder = [.5] * length
+        self._follow_value_recorder = deque(init_follow_recorder, maxlen=length)
+
+        self._guppy_history = PoseHistory(maxlen=length)
+        self._robot_history = PoseHistory(maxlen=length)
 
     @property
     def fear(self):
@@ -86,7 +87,7 @@ class Feedback:
         return min(max(approach_dist - self._safe_speed, 0.0), self._panic_speed) / self._panic_speed
 
     def get_approach_dist(self):
-        dt = 10
+        dt = 40
         if len(self._guppy_history) <= dt:
             dt = len(self._guppy_history) - 1
 

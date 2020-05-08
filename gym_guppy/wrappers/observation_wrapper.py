@@ -3,10 +3,57 @@ from collections import deque
 import gym
 import numpy as np
 
+from gym_guppy import VariableStepGuppyEnv
 from gym_guppy.guppies import AdaptiveCouzinGuppy
+from gym_guppy.tools import Feedback
 from gym_guppy.tools.math import get_local_poses, transform_sin_cos, ray_casting_walls, compute_dist_bins, \
     polar_coordinates
 from gym_guppy.tools.datastructures import LazyFrames
+
+
+class FeedbackInspectionWrapper(gym.Wrapper):
+    def __init__(self, env):
+        assert isinstance(env.unwrapped, VariableStepGuppyEnv)
+
+        super(FeedbackInspectionWrapper, self).__init__(env)
+        self._feedback = [Feedback(update_rate=self.sim_steps_per_second) for _ in range(self.num_guppies)]
+
+        n = self.num_guppies
+        obs_space_low = np.append(self.observation_space.low, ([.0, .0] * n, [.0, .0] * n, [-1., -1.] * n))
+        obs_space_high = np.append(self.observation_space.high, ([1., 1.] * n, [1., 1.] * n, [1., 1.] * n))
+
+        self.observation_space = gym.spaces.Box(low=obs_space_low, high=obs_space_high, dtype=np.float64)
+
+    def reset(self, **kwargs):
+        self._feedback = [Feedback(update_rate=self.sim_steps_per_second) for _ in range(self.num_guppies)]
+
+        obs = super(FeedbackInspectionWrapper, self).reset(**kwargs)
+        return self.observation(obs, {'steps': []})
+
+    def step(self, action):
+        obs, rew, done, info = super(FeedbackInspectionWrapper, self).step(action)
+        obs = self.observation(obs, info)
+        return obs, rew, done, info
+
+    def observation(self, observation, info):
+        if self.num_guppies == 0:
+            return observation.flatten()
+
+        fear_follow = [[(f.fear, f.follow)] for f in self._feedback]
+
+        for step in info['steps']:
+            robot_pose = step[1:4]
+            for i in range(self.env.num_guppies):
+                # feed steps into feedback objects
+                self._feedback[i].update(robot_pose=robot_pose, guppy_pose=step[4 + 3 * i:7 + 3 * i])
+                fear_follow[i].append((self._feedback[i].fear, self._feedback[i].follow))
+
+        fear_follow = np.array(fear_follow)
+        fear_follow_last = fear_follow[:, -1, :].flatten()
+        fear_follow_mean = fear_follow.mean(axis=1).flatten()
+        fear_follow_first = fear_follow[:, 0, :].flatten()
+        fear_follow_change = fear_follow_last - fear_follow_first
+        return np.append(observation, (fear_follow_last, fear_follow_mean, fear_follow_change))
 
 
 class FlatObservationsWrapper(gym.ObservationWrapper):
