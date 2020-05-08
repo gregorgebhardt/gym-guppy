@@ -102,9 +102,9 @@ class TurnBoostAgent(Agent, abc.ABC):
         super().__init__(**kwargs)
 
         self._max_turn_per_step = np.pi / 4.
-        self._max_boost_per_step = .001
+        self._max_boost_per_step = .01
         self._max_turn = 4 * self._max_turn_per_step
-        self._max_boost = 5 * self._max_boost_per_step
+        self._max_boost = 2 * self._max_boost_per_step
 
         self.__turn = None
         self.__boost = None
@@ -227,7 +227,7 @@ class VelocityControlledAgent(Agent, abc.ABC):
         return self._two_wheels_controller
 
     def step(self, time_step):
-        if self._counter % 5 == 0:
+        if self._counter % 4 == 0:
             self._pose_buffer.append(self.get_pose())
             self._target_buffer.append(self._target)
             motor_speeds = self._two_wheels_controller.speeds(self._pose_buffer[0], self._target_buffer[0])

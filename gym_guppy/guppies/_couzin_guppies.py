@@ -106,7 +106,7 @@ def _compute_couzin_boost(local_positions, max_boost, i_r, i_o, i_a, approach_no
         d_boost = n_o * np.random.wald(0.001, 0.05)
 
         if n_a:
-            d_boost += np.linalg.norm(np.sum(local_positions[i_a], axis=0)) / approach_norm * max_boost
+            d_boost += np.linalg.norm(np.sum(local_positions[i_a], axis=0)) / approach_norm * max_boost * 0.5
 
         d_boost /= n_a + n_o
     else:
