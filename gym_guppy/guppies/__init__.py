@@ -5,7 +5,7 @@ from ._robot import Robot, TurnBoostRobot, GoToRobot, GlobalTargetRobot, PolarCo
 from ._couzin_guppies import BaseCouzinGuppy, ClassicCouzinGuppy, BoostCouzinGuppy, AdaptiveCouzinGuppy, \
     BiasedAdaptiveCouzinGuppy
 from ._adaptive_agent import AdaptiveAgent
-from ._randomized_guppies import RandomizedCouzinGuppy
+from ._perturbed_guppies import PerturbedAdaptiveCouzinGuppy
 
 __all__ = [
     'Agent',
@@ -19,7 +19,7 @@ __all__ = [
     'BoostCouzinGuppy',
     'AdaptiveCouzinGuppy',
     'BiasedAdaptiveCouzinGuppy',
-    'RandomizedCouzinGuppy',
+    'PerturbedAdaptiveCouzinGuppy',
     'Robot',
     'TurnBoostRobot',
     'GlobalTargetRobot',

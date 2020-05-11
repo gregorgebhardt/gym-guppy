@@ -231,18 +231,16 @@ class BoostCouzinGuppy(BaseCouzinGuppy, TurnBoostAgent):
 
 
 class AdaptiveCouzinGuppy(BoostCouzinGuppy):
-    _initial_zone_factor = .95
-    _max_zone_factor = 1.
-    _min_zone_factor = .15
-    _zoo_factor = 2.
-
-    _zone_radius_mean = 0.3
-    _zone_radius_noise = 0.01
-    
-    _adaptive_zone_grow_factor = 1.05
-    _adaptive_zone_shrink_factor = 0.99
-
-    def __init__(self, *, unknown_agents: List[Agent] = None, **kwargs):
+    def __init__(self, *,
+                 initial_zone_factor=.95,
+                 max_zone_factor=1.,
+                 min_zone_factor=.15,
+                 zoo_factor=2.,
+                 zone_radius_mean=.3,
+                 zone_radius_noise=.01,
+                 zone_grow_factor=1.05,
+                 zone_shrink_factor=.01,
+                 unknown_agents: List[Agent] = None, **kwargs):
         super().__init__(**kwargs)
 
         if unknown_agents is None:
@@ -253,6 +251,20 @@ class AdaptiveCouzinGuppy(BoostCouzinGuppy):
 
         # currently not used
         self._feedback = [Feedback() for _ in self._unknown_agents]
+
+        # zone factors for computing the couzin zones towards the unknown agents
+        self._initial_zone_factor = initial_zone_factor
+        self._max_zone_factor = max_zone_factor
+        self._min_zone_factor = min_zone_factor
+        self._zoo_factor = zoo_factor
+
+        # add some noise to the zone radius
+        self._zone_radius_mean = zone_radius_mean
+        self._zone_radius_noise = zone_radius_noise
+
+        # zone dynamics
+        self._adaptive_zone_grow_factor = zone_grow_factor
+        self._adaptive_zone_shrink_factor = zone_shrink_factor
 
         # initialize zones
         self._adaptive_zone_factors = np.array([self._initial_zone_factor] * len(self._unknown_agents))
@@ -371,4 +383,3 @@ class BiasedAdaptiveCouzinGuppy(AdaptiveCouzinGuppy):
                     turn_bias += -1 * np.sign(rp_th) * self.bias_gain * self._max_turn_per_step * (1 - rp_r)
 
         self.turn += turn_bias
-

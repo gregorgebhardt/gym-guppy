@@ -6,7 +6,7 @@ import h5py
 import numpy as np
 
 from gym_guppy import AdaptiveCouzinGuppy
-from gym_guppy.guppies._randomized_guppies import RandomizedCouzinGuppy
+from gym_guppy.guppies import PerturbedAdaptiveCouzinGuppy
 from gym_guppy.reward.robot_reward import follow_reward
 
 
@@ -100,7 +100,7 @@ class OmniscienceWrapper(gym.Wrapper):
 
     def _get_information(self):
         dr_parameters = np.array \
-            ([g.dr_parameter_list for g in self.env.guppies if isinstance(g, RandomizedCouzinGuppy)]).flatten()
+            ([g.dr_parameter_list for g in self.env.guppies if isinstance(g, PerturbedAdaptiveCouzinGuppy)]).flatten()
         zones = np.array \
             ([g.couzin_zones for g in self.env.guppies if isinstance(g, AdaptiveCouzinGuppy)]).flatten()
         time_left = np.array([(self.max_time_steps - self.t) / self.max_time_steps]).flatten()
