@@ -1,5 +1,5 @@
 import numpy as np
-from gym_guppy import AdaptiveCouzinGuppy
+from ._couzin_guppies import AdaptiveCouzinGuppy
 
 
 class PerturbedAdaptiveCouzinGuppy(AdaptiveCouzinGuppy):
