@@ -93,9 +93,9 @@ class ConfigurableGuppyEnv(GuppyEnv, abc.ABC):
         for pose in fish_poses:
             guppy_args = dict(world=self.world, world_bounds=self.world_bounds, position=pose[:2], orientation=pose[2])
             guppy_args.update(next(guppy_args_cycle))
-            if self.guppy_type in [AdaptiveCouzinGuppy, BiasedAdaptiveCouzinGuppy]:
+            if issubclass(self.guppy_type, AdaptiveCouzinGuppy):
                 guppy_args['unknown_agents'] = [self.robot]
-            if self.guppy_type in [BiasedAdaptiveCouzinGuppy]:
+            if issubclass(self.guppy_type, BiasedAdaptiveCouzinGuppy):
                 guppy_args['repulsion_points'] = [[.0, .0]]
 
             self._add_guppy(self.guppy_type(**guppy_args))

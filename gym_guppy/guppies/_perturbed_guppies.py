@@ -4,7 +4,6 @@ from ._couzin_guppies import AdaptiveCouzinGuppy
 
 class PerturbedAdaptiveCouzinGuppy(AdaptiveCouzinGuppy):
     def __init__(self, *,
-                 # TODO add default values
                  initial_zone_factor_std=0.1,
                  zone_radius_std=0.1,
                  adaptive_zone_grow_factor_noise=0.1,
@@ -23,3 +22,5 @@ class PerturbedAdaptiveCouzinGuppy(AdaptiveCouzinGuppy):
             np.random.randn()) * adaptive_zone_shrink_factor_noise
 
         self._zoo_factor = self._zoo_factor + np.abs(np.random.randn()) * zoo_factor_noise
+
+        self._update_zones()
