@@ -20,8 +20,8 @@ class MXNetGuppy(Guppy, TurnSpeedAgent, ABC):
 
         self._locomotion = np.array([[.0, .0]])
 
-        with h5py.File(hdf_file) as f:
             symbol_json = f.attrs.get('symbols')
+        with h5py.File(hdf_file, "r") as f:
 
             locomotion_size = f.attrs.get('locomotion_size')
             rc_agents_size = f.attrs.get('view_of_agents_size')
