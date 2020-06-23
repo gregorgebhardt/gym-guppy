@@ -32,8 +32,8 @@ class MXNetGuppy(Guppy, TurnSpeedAgent, ABC):
             self._far_plane = f.attrs["far_plane"] / 100.
 
             (turn_start, turn_stop, turn_size), (speed_start, speed_stop, speed_size) = f.attrs["locomotion"]
-            self._turn_bins = np.linspace(turn_start, turn_stop, turn_size + 1)
-            self._speed_bins = np.linspace(speed_start, speed_stop, speed_size + 1) / 100. * 25.
+            self._turn_bins = np.linspace(turn_start, turn_stop, int(turn_size) + 1)
+            self._speed_bins = np.linspace(speed_start, speed_stop, int(speed_size) + 1) / 100. * 25.
 
             params = {k: mx.ndarray.array(v) for k, v in f['params'][f"{epoch:04}"].items()}
 
