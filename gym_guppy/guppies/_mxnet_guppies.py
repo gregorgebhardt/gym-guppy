@@ -15,12 +15,12 @@ class MXNetGuppy(Guppy, TurnSpeedAgent, ABC):
     _linear_damping = .0
     _angular_damping = .0
 
-    def __init__(self, *, hdf_file, epoch, **kwargs):
+    def __init__(self, *, training_file, epoch, **kwargs):
         super().__init__(**kwargs)
 
         self._locomotion = np.array([[.0, .0]])
 
-        with h5py.File(hdf_file, "r") as f:
+        with h5py.File(training_file, "r") as f:
             symbol_json = f.attrs["symbols"]
 
             locomotion_size = f.attrs["locomotion_size"]
