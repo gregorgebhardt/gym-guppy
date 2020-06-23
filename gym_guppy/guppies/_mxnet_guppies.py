@@ -15,8 +15,11 @@ class MXNetGuppy(Guppy, TurnSpeedAgent, ABC):
     _linear_damping = .0
     _angular_damping = .0
 
-    def __init__(self, *, training_file, epoch, **kwargs):
+    def __init__(self, *, training_file, epoch, world_size_cm=100, model_fps=25, **kwargs):
         super().__init__(**kwargs)
+
+        self._world_size_cm = float(world_size_cm)
+        self._model_fps = float(model_fps)
 
         self._locomotion = np.array([[.0, .0]])
 
@@ -29,11 +32,11 @@ class MXNetGuppy(Guppy, TurnSpeedAgent, ABC):
 
             self._agents_sectors = f.attrs["view_of_agents_sectors"]
             self._wall_rays = f.attrs["view_of_walls_rays"]
-            self._far_plane = f.attrs["far_plane"] / 100.
+            self._far_plane = f.attrs["far_plane"] / self._world_size_cm
 
             (turn_start, turn_stop, turn_size), (speed_start, speed_stop, speed_size) = f.attrs["locomotion"]
             self._turn_bins = np.linspace(turn_start, turn_stop, int(turn_size) + 1)
-            self._speed_bins = np.linspace(speed_start, speed_stop, int(speed_size) + 1) / 100. * 25.
+            self._speed_bins = np.linspace(speed_start, speed_stop, int(speed_size) + 1) / self._world_size_cm * self._model_fps
 
             params = {k: mx.ndarray.array(v) for k, v in f['params'][f"{epoch:04}"].items()}
 
@@ -76,4 +79,4 @@ class MXNetGuppy(Guppy, TurnSpeedAgent, ABC):
         speed_idx = mx.random.multinomial(loc_speed).asscalar()
         self.speed = np.random.uniform(self._speed_bins[speed_idx], self._speed_bins[speed_idx + 1])
 
-        self._locomotion[:] = self.turn, self.speed / 25. * 100.
+        self._locomotion[:] = self.turn, self.speed / self._model_fps * self._world_size_cm
