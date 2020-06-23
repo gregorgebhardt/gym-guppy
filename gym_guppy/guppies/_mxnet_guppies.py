@@ -60,14 +60,6 @@ class MXNetGuppy(Guppy, TurnSpeedAgent, ABC):
         i = kd_tree.query_ball_point(pose[:2], r=self._far_plane)
         i = np.atleast_1d(i)
 
-        # check pose difference against last action
-        # pose_diff = pose - self._last_pose
-        # ori_diff = pose_diff[2]
-        # pos_diff = np.linalg.norm(pose_diff[:2]) * 100.
-        # if self.id == 0:
-        #     print(f'pose error: {pos_diff - self._locomotion[0, 1]}, {ori_diff - self._locomotion[0, 0]}')
-        # self._last_pose = pose
-
         rc_agents = compute_dist_bins(pose, state[i[1:], :], self._agents_sectors, self._far_plane).reshape(1, -1)
         rc_walls = ray_casting_walls(pose, self._world_bounds, self._wall_rays, self._far_plane).reshape(1, -1)
         rc_walls = np.maximum(rc_walls, .0)
