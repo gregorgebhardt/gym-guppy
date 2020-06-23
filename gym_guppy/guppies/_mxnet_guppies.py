@@ -20,18 +20,18 @@ class MXNetGuppy(Guppy, TurnSpeedAgent, ABC):
 
         self._locomotion = np.array([[.0, .0]])
 
-            symbol_json = f.attrs.get('symbols')
         with h5py.File(hdf_file, "r") as f:
+            symbol_json = f.attrs["symbols"]
 
-            locomotion_size = f.attrs.get('locomotion_size')
-            rc_agents_size = f.attrs.get('view_of_agents_size')
-            rc_walls_size = f.attrs.get('view_of_walls_size')
+            locomotion_size = f.attrs["locomotion_size"]
+            rc_agents_size = f.attrs["view_of_agents_size"]
+            rc_walls_size = f.attrs["view_of_walls_size"]
 
-            self._agents_sectors = f.attrs.get('view_of_agents_sectors')
-            self._wall_rays = f.attrs.get('view_of_walls_rays')
-            self._far_plane = f.attrs.get('far_plane') / 100.
+            self._agents_sectors = f.attrs["view_of_agents_sectors"]
+            self._wall_rays = f.attrs["view_of_walls_rays"]
+            self._far_plane = f.attrs["far_plane"] / 100.
 
-            (turn_start, turn_stop, turn_size), (speed_start, speed_stop, speed_size) = f.attrs.get('locomotion')
+            (turn_start, turn_stop, turn_size), (speed_start, speed_stop, speed_size) = f.attrs["locomotion"]
             self._turn_bins = np.linspace(turn_start, turn_stop, turn_size + 1)
             self._speed_bins = np.linspace(speed_start, speed_stop, speed_size + 1) / 100. * 25.
 
