@@ -15,27 +15,36 @@ class MXNetGuppy(Guppy, TurnSpeedAgent, ABC):
     _linear_damping = .0
     _angular_damping = .0
 
-    def __init__(self, *, hdf_file, **kwargs):
+    def __init__(self, *, training_file, epoch, world_size_cm=100, model_fps=25, **kwargs):
         super().__init__(**kwargs)
+
+        self._world_size_cm = float(world_size_cm)
+        self._model_fps = float(model_fps)
+
+        self._random = np.random.RandomState()
 
         self._locomotion = np.array([[.0, .0]])
 
-        with h5py.File(hdf_file) as f:
-            symbol_json = f.attrs.get('symbols')
+        with h5py.File(training_file, "r") as f:
+            symbol_json = f.attrs["symbols"]
 
-            locomotion_size = f.attrs.get('locomotion_size')
-            rc_agents_size = f.attrs.get('view_of_agents_size')
-            rc_walls_size = f.attrs.get('view_of_walls_size')
+            locomotion_size = f.attrs["locomotion_size"]
+            rc_agents_size = f.attrs["view_of_agents_size"]
+            rc_walls_size = f.attrs["view_of_walls_size"]
 
-            self._agents_sectors = f.attrs.get('view_of_agents_sectors')
-            self._wall_rays = f.attrs.get('view_of_walls_rays')
-            self._far_plane = f.attrs.get('far_plane') / 100.
+            self._agents_sectors = f.attrs["view_of_agents_sectors"]
+            self._wall_rays = f.attrs["view_of_walls_rays"]
+            self._far_plane = f.attrs["far_plane"] / self._world_size_cm
 
-            (turn_start, turn_stop, turn_size), (speed_start, speed_stop, speed_size) = f.attrs.get('locomotion')
+            (turn_start, turn_stop, turn_size), (speed_start, speed_stop, speed_size) = f.attrs["locomotion"]
+            turn_size = int(turn_size)
+            speed_size = int(speed_size)
+            self._turn_bin_indices = tuple(range(turn_size))
             self._turn_bins = np.linspace(turn_start, turn_stop, turn_size + 1)
-            self._speed_bins = np.linspace(speed_start, speed_stop, speed_size + 1) / 100. * 25.
+            self._speed_bin_indices = tuple(range(speed_size))
+            self._speed_bins = np.linspace(speed_start, speed_stop, speed_size + 1) / self._world_size_cm * self._model_fps
 
-            params = {k: mx.ndarray.array(v) for k, v in f['params']['0016'].items()}
+            params = {k: mx.ndarray.array(v) for k, v in f['params'][f"{epoch:04}"].items()}
 
         with mx.cpu() as ctx:
             self._symbols = mx.symbol.load_json(symbol_json)
@@ -60,14 +69,6 @@ class MXNetGuppy(Guppy, TurnSpeedAgent, ABC):
         i = kd_tree.query_ball_point(pose[:2], r=self._far_plane)
         i = np.atleast_1d(i)
 
-        # check pose difference against last action
-        # pose_diff = pose - self._last_pose
-        # ori_diff = pose_diff[2]
-        # pos_diff = np.linalg.norm(pose_diff[:2]) * 100.
-        # if self.id == 0:
-        #     print(f'pose error: {pos_diff - self._locomotion[0, 1]}, {ori_diff - self._locomotion[0, 0]}')
-        # self._last_pose = pose
-
         rc_agents = compute_dist_bins(pose, state[i[1:], :], self._agents_sectors, self._far_plane).reshape(1, -1)
         rc_walls = ray_casting_walls(pose, self._world_bounds, self._wall_rays, self._far_plane).reshape(1, -1)
         rc_walls = np.maximum(rc_walls, .0)
@@ -78,10 +79,10 @@ class MXNetGuppy(Guppy, TurnSpeedAgent, ABC):
         loc_turn, loc_speed, *self._r_states = self._executor.forward(feature=feature, **r_params)
 
         # sample from categorical distributions
-        turn_idx = mx.random.multinomial(loc_turn).asscalar()
-        self.turn = np.random.uniform(self._turn_bins[turn_idx], self._turn_bins[turn_idx+1])
+        turn_idx = self._random.choice(self._turn_bin_indices, p=loc_turn.asnumpy().ravel())
+        self.turn = self._random.uniform(self._turn_bins[turn_idx], self._turn_bins[turn_idx+1])
 
-        speed_idx = mx.random.multinomial(loc_speed).asscalar()
-        self.speed = np.random.uniform(self._speed_bins[speed_idx], self._speed_bins[speed_idx + 1])
+        speed_idx = self._random.choice(self._speed_bin_indices, p=loc_speed.asnumpy().ravel())
+        self.speed = self._random.uniform(self._speed_bins[speed_idx], self._speed_bins[speed_idx + 1])
 
-        self._locomotion[:] = self.turn, self.speed / 25. * 100.
+        self._locomotion[:] = self.turn, self.speed / self._model_fps * self._world_size_cm
