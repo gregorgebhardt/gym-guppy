@@ -44,8 +44,8 @@ class Feedback:
         self._robot_history.store(robot_pose)
         self._guppy_history.store(guppy_pose)
 
-        if len(self._robot_history) < self._robot_history.maxlen:
-            return
+        # if len(self._robot_history) < self._robot_history.maxlen:
+        #     return
 
         # compute distance
         dist = np.linalg.norm(robot_pose - guppy_pose)
@@ -77,7 +77,7 @@ class Feedback:
 
     def _get_follow(self):
         approach_dist = self.get_approach_dist()
-        # crop approach dist to negative values and take the double absolute value
+        # crop approach dist to positive values and take the double
         approach_dist = 2. * max(approach_dist, 0.0)
 
         # multiply approach dist with exponential correction term
@@ -87,9 +87,10 @@ class Feedback:
         return min(max(approach_dist - self._safe_speed, 0.0), self._panic_speed) / self._panic_speed
 
     def get_approach_dist(self):
-        dt = 40
+        dt = 50
         if len(self._guppy_history) <= dt:
-            dt = len(self._guppy_history) - 1
+            return 0
+            # dt = len(self._guppy_history) - 1
 
         guppy_now = self._guppy_history.positions[0]
         guppy_prv = self._guppy_history.positions[dt]

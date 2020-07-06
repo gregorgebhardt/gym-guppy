@@ -215,6 +215,7 @@ class VelocityControlledAgent(Agent, abc.ABC):
         self._target = None
         self._counter = 0
 
+        # TODO: add explanation for magic numbers
         self._tau = 4
         self._vel_buffer = deque([(.0, .0)] * self._tau, maxlen=self._tau)
         self._ctrl_buffer = deque([(.0, .0)] * self._tau, maxlen=self._tau)
@@ -227,6 +228,7 @@ class VelocityControlledAgent(Agent, abc.ABC):
         return self._two_wheels_controller
 
     def step(self, time_step):
+        # run controller with 25Hz (simulation with 100Hz)
         if self._counter % 4 == 0:
             self._pose_buffer.append(self.get_pose())
             self._target_buffer.append(self._target)

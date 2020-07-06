@@ -124,6 +124,7 @@ def _wall_repulsion(self_pos, self_theta, world_bounds, zor=_ZOR):
 
     close_walls = dist_to_walls.flatten() < zor
     if np.any(close_walls):
+        # TODO check this for upper left and lower right corner, could be buggy!!
         if np.argmin(dist_to_walls[:, 1]):
             sign = -1
         else:
@@ -239,7 +240,7 @@ class AdaptiveCouzinGuppy(BoostCouzinGuppy):
                  zone_radius_mean=.3,
                  zone_radius_noise=.01,
                  zone_grow_factor=1.05,
-                 zone_shrink_factor=.01,
+                 zone_shrink_factor=.99,
                  unknown_agents: List[Agent] = None, **kwargs):
         super().__init__(**kwargs)
 

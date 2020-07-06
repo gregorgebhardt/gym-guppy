@@ -3,6 +3,9 @@ from ._couzin_guppies import AdaptiveCouzinGuppy
 
 
 class PerturbedAdaptiveCouzinGuppy(AdaptiveCouzinGuppy):
+    """
+    randomized guppy simulation
+    """
     def __init__(self, *,
                  initial_zone_factor_std=0.1,
                  zone_radius_std=0.1,
